@@ -9,8 +9,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
+	"time"
 
 	"github.com/polyfloyd/glsl"
 )
@@ -21,7 +23,14 @@ func main() {
 	width := flag.Uint("w", 512, "The width of the rendered image")
 	height := flag.Uint("h", 512, "The height of the rendered image")
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image")
+	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
+	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
 	flag.Parse()
+
+	if *numFrames != 0 && *framerate == 0 {
+		PrintError(fmt.Errorf("The numframes is set while the framerate is not set"))
+		return
+	}
 
 	runtime.LockOSThread()
 
@@ -65,11 +74,44 @@ func main() {
 	}
 	defer outWriter.Close()
 
-	// Export the image.
-	if err := Export(outWriter, img, format); err != nil {
-		PrintError(err)
+	if *framerate <= 0 {
+		// We're not dealing with an animation, just export a single image.
+		if err := Export(outWriter, img, format); err != nil {
+			PrintError(err)
+			return
+		}
 		return
 	}
+
+	animStream := make(chan image.Image, int(*framerate)+1)
+	cancelAnim := make(chan struct{})
+	defer close(animStream)
+	defer close(cancelAnim)
+	go func() {
+		sig := make(chan os.Signal, 1)
+		defer close(sig)
+		signal.Notify(sig)
+		<-sig
+		cancelAnim <- struct{}{}
+	}()
+	go func() {
+		for frame := uint(1); ; frame++ {
+			img := <-animStream
+			if img == nil {
+				break
+			}
+			if err := Export(outWriter, img, format); err != nil {
+				cancelAnim <- struct{}{}
+				PrintError(err)
+				break
+			}
+			if frame == *numFrames {
+				cancelAnim <- struct{}{}
+				break
+			}
+		}
+	}()
+	sh.Animate(*width, *height, time.Duration(float64(time.Second) / *framerate), animStream, cancelAnim, nil)
 }
 
 func OpenReader(filename string) (io.ReadCloser, error) {

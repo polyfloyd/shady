@@ -114,6 +114,25 @@ func (sh *Shader) Image(w, h uint, uniformValues map[string]func(int32)) image.I
 	return img
 }
 
+func (sh *Shader) Animate(w, h uint, interval time.Duration, stream chan<- image.Image, cancel <-chan struct{}, uniformValues map[string]func(int32)) {
+	if uniformValues == nil {
+		uniformValues = map[string]func(int32){}
+	}
+
+	var t time.Duration
+	for {
+		uniformValues["time"] = func(loc int32) {
+			gl.Uniform1f(loc, float32(t)/float32(time.Second))
+		}
+		select {
+		case <-cancel:
+			return
+		case stream <- sh.Image(w, h, uniformValues):
+		}
+		t += interval
+	}
+}
+
 func (sh *Shader) Close() error {
 	gl.DeleteProgram(sh.program)
 	gl.DeleteBuffers(1, &sh.canvas)
