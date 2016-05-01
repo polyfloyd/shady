@@ -68,7 +68,6 @@ func main() {
 		return
 	}
 	defer sh.Close()
-	img := sh.Image(nil)
 
 	// Open the output.
 	outWriter, err := OpenWriter(*outputFile)
@@ -79,6 +78,7 @@ func main() {
 	defer outWriter.Close()
 
 	if *framerate <= 0 {
+		img := sh.Image(nil)
 		// We're not dealing with an animation, just export a single image.
 		if err := Export(outWriter, img, format); err != nil {
 			PrintError(err)
