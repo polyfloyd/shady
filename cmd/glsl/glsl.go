@@ -4,16 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"image"
-	"image/color/palette"
-	"image/draw"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/signal"
-	"path"
 	"runtime"
 	"sync"
 	"time"
@@ -41,7 +35,7 @@ func main() {
 	// Detect the output format.
 	format := *outputFormat
 	if format == "" {
-		format = DetectFormat(*outputFile)
+		format = glsl.DetectFormat(*outputFile)
 	}
 	if format == "" {
 		PrintError(fmt.Errorf("Unable to detect output format. Please set the -ofmt flag"))
@@ -80,7 +74,7 @@ func main() {
 	if *framerate <= 0 {
 		img := sh.Image(nil)
 		// We're not dealing with an animation, just export a single image.
-		if err := Export(outWriter, img, format); err != nil {
+		if err := glsl.Encode(outWriter, img, format); err != nil {
 			PrintError(err)
 			return
 		}
@@ -103,7 +97,7 @@ func main() {
 		cancelAnim <- struct{}{}
 	}()
 	go func() {
-		if err := ExportAnim(outWriter, counterStream, format, interval); err != nil {
+		if err := glsl.EncodeAnim(outWriter, counterStream, format, interval); err != nil {
 			PrintError(fmt.Errorf("Error animating: %v", err))
 			cancelAnim <- struct{}{}
 			go func() {
@@ -152,61 +146,6 @@ type nopCloseWriter struct {
 
 func (nopCloseWriter) Close() error {
 	return nil
-}
-
-func DetectFormat(filename string) string {
-	ext := path.Ext(filename)
-	if len(ext) == 0 {
-		return ""
-	}
-	switch ext[1:] {
-	case "png":
-		return "png"
-	case "jpg", "jpeg":
-		return "jpg"
-	case "gif":
-		return "gif"
-	default:
-		return ""
-	}
-}
-
-func Export(writer io.Writer, img image.Image, format string) error {
-	switch format {
-	case "png":
-		return png.Encode(writer, img)
-	case "jpg":
-		return jpeg.Encode(writer, img, nil)
-	}
-	return fmt.Errorf("Unknown output format: %q", format)
-}
-
-func ExportAnim(writer io.Writer, imgStream <-chan image.Image, format string, interval time.Duration) error {
-	switch format {
-	case "gif":
-		gifImg := &gif.GIF{
-			Image:           []*image.Paletted{},
-			Delay:           []int{},
-			LoopCount:       0,
-			Disposal:        []byte{},
-			BackgroundIndex: 0,
-		}
-		for img := range imgStream {
-			frame := image.NewPaletted(img.Bounds(), palette.Plan9)
-			draw.Draw(frame, img.Bounds(), img, image.Point{X: 0, Y: 0}, draw.Over)
-			gifImg.Image = append(gifImg.Image, frame)
-			gifImg.Delay = append(gifImg.Delay, int(interval/(time.Second/100)))
-			gifImg.Disposal = append(gifImg.Disposal, gif.DisposalBackground)
-		}
-		return gif.EncodeAll(writer, gifImg)
-	default:
-		for img := range imgStream {
-			if err := Export(writer, img, format); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
 }
 
 func PrintError(err error) {
