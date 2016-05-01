@@ -2,29 +2,61 @@ package glsl
 
 import (
 	"fmt"
+	"io"
+	"runtime"
 	"strings"
+	"time"
+	"unsafe"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 )
 
-func glError() error {
-	switch gl.GetError() {
-	case gl.INVALID_ENUM:
-		return fmt.Errorf("INVALID_ENUM")
-	case gl.INVALID_VALUE:
-		return fmt.Errorf("INVALID_VALUE")
-	case gl.INVALID_OPERATION:
-		return fmt.Errorf("INVALID_OPERATION")
-	case gl.INVALID_FRAMEBUFFER_OPERATION:
-		return fmt.Errorf("INVALID_FRAMEBUFFER_OPERATION")
-	case gl.OUT_OF_MEMORY:
-		return fmt.Errorf("OUT_OF_MEMORY")
-	case gl.STACK_UNDERFLOW:
-		return fmt.Errorf("STACK_UNDERFLOW")
-	case gl.STACK_OVERFLOW:
-		return fmt.Errorf("STACK_OVERFLOW")
+type GLDebugMessage struct {
+	ID       uint32
+	Source   uint32
+	Type     uint32
+	Severity uint32
+	Message  string
+	Stack    string
+}
+
+func (dm GLDebugMessage) String() string {
+	var sev string
+	switch dm.Severity {
+	case gl.DEBUG_SEVERITY_HIGH:
+		sev = "high"
+	case gl.DEBUG_SEVERITY_MEDIUM:
+		sev = "medium"
+	case gl.DEBUG_SEVERITY_LOW:
+		sev = "low"
+	case gl.DEBUG_SEVERITY_NOTIFICATION:
+		sev = "note"
 	}
-	return nil
+	return fmt.Sprintf("[%s] %s", sev, dm.Message)
+}
+
+func GLDebugOutput(out io.Writer) <-chan GLDebugMessage {
+	ch := make(chan GLDebugMessage, 32)
+	gl.Enable(gl.DEBUG_OUTPUT)
+	gl.DebugMessageControl(gl.DONT_CARE, gl.DONT_CARE, gl.DONT_CARE, 0, nil, true)
+	gl.DebugMessageCallback(func(source uint32, typ uint32, id uint32, severity uint32, length int32, message string, userParam unsafe.Pointer) {
+		dm := GLDebugMessage{
+			ID:       id,
+			Source:   source,
+			Type:     typ,
+			Severity: severity,
+			Message:  message,
+		}
+		var stack [512]byte
+		stackLen := runtime.Stack(stack[:], false)
+		dm.Stack = string(stack[:stackLen])
+
+		select {
+		case ch <- dm:
+		default:
+		}
+	}, nil)
+	return ch
 }
 
 func compileShader(typ uint32, source string) (uint32, error) {

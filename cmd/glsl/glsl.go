@@ -58,13 +58,13 @@ func main() {
 	}
 
 	// Compile the shader.
-	sh, err := glsl.NewShader(string(shaderSource))
+	sh, err := glsl.NewShader(*width, *height, string(shaderSource))
 	if err != nil {
 		PrintError(err)
 		return
 	}
 	defer sh.Close()
-	img := sh.Image(*width, *height, nil)
+	img := sh.Image(nil)
 
 	// Open the output.
 	outWriter, err := OpenWriter(*outputFile)
@@ -111,7 +111,7 @@ func main() {
 			}
 		}
 	}()
-	sh.Animate(*width, *height, time.Duration(float64(time.Second) / *framerate), animStream, cancelAnim, nil)
+	sh.Animate(time.Duration(float64(time.Second) / *framerate), animStream, cancelAnim, nil)
 }
 
 func OpenReader(filename string) (io.ReadCloser, error) {
