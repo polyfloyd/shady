@@ -1,6 +1,7 @@
 package glsl
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color/palette"
@@ -10,6 +11,8 @@ import (
 	"image/png"
 	"io"
 	"path"
+	"runtime"
+	"sync"
 	"time"
 )
 
@@ -45,12 +48,55 @@ func EncodeAnim(writer io.Writer, imgStream <-chan image.Image, format string, i
 	case "gif":
 		return EncodeGIF(writer, imgStream, interval)
 	default:
-		for img := range imgStream {
-			if err := Encode(writer, img, format); err != nil {
-				return err
+		return EncodeSequence(writer, imgStream, format)
+	}
+}
+
+func EncodeSequence(writer io.Writer, imgStream <-chan image.Image, format string) error {
+	errs := make(chan error)
+	encoded := make(chan chan []byte, runtime.NumCPU()) // Channelception.
+	defer close(errs)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for out := range encoded {
+			if _, err := writer.Write(<-out); err != nil {
+				errs <- err
+				break
 			}
 		}
-		return nil
+		wg.Done()
+	}()
+
+	for {
+		select {
+		case err := <-errs:
+			close(encoded)
+			return err
+		case img, ok := <-imgStream:
+			if !ok {
+				close(encoded)
+				wg.Wait()
+				return nil
+			}
+			out := make(chan []byte)
+			go func(img image.Image, out chan []byte) {
+				var buf bytes.Buffer
+				if err := Encode(&buf, img, format); err != nil {
+					errs <- err
+				} else {
+					out <- buf.Bytes()
+				}
+				close(out)
+			}(img, out)
+			select {
+			case err := <-errs:
+				close(encoded)
+				return err
+			case encoded <- out:
+			}
+		}
 	}
 }
 
