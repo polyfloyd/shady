@@ -28,6 +28,8 @@ func DetectFormat(filename string) string {
 		return "jpg"
 	case "gif":
 		return "gif"
+	case "rgba32":
+		return "rgba32"
 	default:
 		return ""
 	}
@@ -39,8 +41,22 @@ func Encode(writer io.Writer, img image.Image, format string) error {
 		return png.Encode(writer, img)
 	case "jpg":
 		return jpeg.Encode(writer, img, nil)
+	case "rgba32":
+		return EncodeRGBA32(writer, img)
 	}
 	return fmt.Errorf("Unknown output format: %q", format)
+}
+
+func EncodeRGBA32(writer io.Writer, img image.Image) error {
+	var rgbaImg *image.RGBA
+	if i, ok := img.(*image.RGBA); ok {
+		rgbaImg = i
+	} else {
+		rgbaImg = image.NewRGBA(img.Bounds())
+		draw.Draw(rgbaImg, img.Bounds(), img, image.Point{X: 0, Y: 0}, draw.Over)
+	}
+	_, err := writer.Write(rgbaImg.Pix)
+	return err
 }
 
 func EncodeAnim(writer io.Writer, imgStream <-chan image.Image, format string, interval time.Duration) error {
