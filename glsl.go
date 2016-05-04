@@ -60,7 +60,7 @@ func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
 		return nil, err
 	}
 
-	debug := GLDebugOutput(os.Stderr)
+	debug := GLDebugOutput()
 	go func() {
 		for dm := range debug {
 			if dm.Severity == gl.DEBUG_SEVERITY_HIGH {

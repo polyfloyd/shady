@@ -35,7 +35,7 @@ func (dm GLDebugMessage) String() string {
 	return fmt.Sprintf("[%s] %s", sev, dm.Message)
 }
 
-func GLDebugOutput(out io.Writer) <-chan GLDebugMessage {
+func GLDebugOutput() <-chan GLDebugMessage {
 	ch := make(chan GLDebugMessage, 32)
 	gl.Enable(gl.DEBUG_OUTPUT)
 	gl.DebugMessageControl(gl.DONT_CARE, gl.DONT_CARE, gl.DONT_CARE, 0, nil, true)
