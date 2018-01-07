@@ -2,10 +2,8 @@ package glsl
 
 import (
 	"fmt"
-	"io"
 	"runtime"
 	"strings"
-	"time"
 	"unsafe"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -75,7 +73,7 @@ func compileShader(typ uint32, source string) (uint32, error) {
 		log := strings.Repeat("\x00", int(logLen+1))
 		gl.GetShaderInfoLog(shader, logLen, nil, gl.Str(log))
 		gl.DeleteShader(shader)
-		return 0, ShaderError{
+		return 0, shaderError{
 			stage:   typ,
 			message: log,
 		}
@@ -114,7 +112,7 @@ func linkProgram(sources map[uint32]string) (uint32, error) {
 		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLen)
 		log := strings.Repeat("\x00", int(logLen+1))
 		gl.GetProgramInfoLog(program, logLen, nil, gl.Str(log))
-		linkErr = ShaderError{message: log}
+		linkErr = shaderError{message: log}
 	}
 
 	for _, sh := range shaders {
@@ -128,13 +126,13 @@ func linkProgram(sources map[uint32]string) (uint32, error) {
 	return program, nil
 }
 
-type ShaderError struct {
+type shaderError struct {
 	stage uint32
 
 	message string
 }
 
-func (err ShaderError) Error() (str string) {
+func (err shaderError) Error() (str string) {
 	if err.stage == gl.VERTEX_SHADER {
 		str += "Error compiling vertex shader:\n"
 	} else if err.stage == gl.FRAGMENT_SHADER {

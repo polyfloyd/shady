@@ -1,6 +1,7 @@
 package glsl
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"os"
@@ -81,8 +82,8 @@ func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 
 	gl.GenBuffers(int32(len(sh.pbos)), &sh.pbos[0])
-	for _, bufId := range sh.pbos {
-		gl.BindBuffer(gl.PIXEL_PACK_BUFFER, bufId)
+	for _, bufID := range sh.pbos {
+		gl.BindBuffer(gl.PIXEL_PACK_BUFFER, bufID)
 		gl.BufferStorage(gl.PIXEL_PACK_BUFFER, int(sh.w*sh.h*4), nil, gl.STREAM_READ)
 	}
 	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
@@ -147,7 +148,7 @@ func (sh *Shader) Image(uniformValues map[string]func(int32)) image.Image {
 	return sh.downloadImage(0)
 }
 
-func (sh *Shader) Animate(interval time.Duration, stream chan<- image.Image, cancel <-chan struct{}, uniformValues map[string]func(int32)) {
+func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream chan<- image.Image, uniformValues map[string]func(int32)) {
 	if uniformValues == nil {
 		uniformValues = map[string]func(int32){}
 	}
@@ -171,7 +172,7 @@ func (sh *Shader) Animate(interval time.Duration, stream chan<- image.Image, can
 
 		img := sh.downloadImage(int((frame - 1) % uint64(len(sh.pbos))))
 		select {
-		case <-cancel:
+		case <-ctx.Done():
 			return
 		case stream <- img:
 		}

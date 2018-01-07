@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"image"
@@ -26,7 +27,7 @@ func main() {
 	flag.Parse()
 
 	if *numFrames != 0 && *framerate == 0 {
-		PrintError(fmt.Errorf("The numframes is set while the framerate is not set"))
+		printError(fmt.Errorf("The numframes is set while the framerate is not set"))
 		return
 	}
 
@@ -38,35 +39,34 @@ func main() {
 		format = glsl.DetectFormat(*outputFile)
 	}
 	if format == "" {
-		PrintError(fmt.Errorf("Unable to detect output format. Please set the -ofmt flag"))
+		printError(fmt.Errorf("Unable to detect output format. Please set the -ofmt flag"))
 		return
 	}
 
 	// Load the shader.
-	shaderSourceFile, err := OpenReader(*inputFile)
+	shaderSourceFile, err := openReader(*inputFile)
 	if err != nil {
-		PrintError(err)
+		printError(err)
 		return
 	}
 	defer shaderSourceFile.Close()
 	shaderSource, err := ioutil.ReadAll(shaderSourceFile)
 	if err != nil {
-		PrintError(err)
+		printError(err)
 		return
 	}
-
 	// Compile the shader.
 	sh, err := glsl.NewShader(*width, *height, string(shaderSource))
 	if err != nil {
-		PrintError(err)
+		printError(err)
 		return
 	}
 	defer sh.Close()
 
 	// Open the output.
-	outWriter, err := OpenWriter(*outputFile)
+	outWriter, err := openWriter(*outputFile)
 	if err != nil {
-		PrintError(err)
+		printError(err)
 		return
 	}
 	defer outWriter.Close()
@@ -75,34 +75,33 @@ func main() {
 		img := sh.Image(nil)
 		// We're not dealing with an animation, just export a single image.
 		if err := glsl.Encode(outWriter, img, format); err != nil {
-			PrintError(err)
+			printError(err)
 			return
 		}
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	interval := time.Duration(float64(time.Second) / *framerate)
 	imgStream := make(chan image.Image, int(*framerate)+1)
 	counterStream := make(chan image.Image)
-	cancelAnim := make(chan struct{}, 4)
-	defer close(cancelAnim)
 	var waitgroup sync.WaitGroup
 	waitgroup.Add(2)
 	go func() {
-		sig := make(chan os.Signal, 16)
-		defer close(sig)
-		signal.Notify(sig)
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, os.Interrupt)
 		<-sig
 		signal.Stop(sig)
-		cancelAnim <- struct{}{}
+		cancel()
 	}()
 	go func() {
 		if err := glsl.EncodeAnim(outWriter, counterStream, format, interval); err != nil {
-			PrintError(fmt.Errorf("Error animating: %v", err))
-			cancelAnim <- struct{}{}
+			printError(fmt.Errorf("Error animating: %v", err))
+			cancel()
 			go func() {
 				// Prevent deadlocking the counter routine.
-				for _ = range counterStream {
+				for range counterStream {
 				}
 			}()
 		}
@@ -115,25 +114,25 @@ func main() {
 			frame++
 			counterStream <- img
 			if frame == *numFrames {
-				cancelAnim <- struct{}{}
+				cancel()
 				break
 			}
 		}
 		waitgroup.Done()
 	}()
-	sh.Animate(interval, imgStream, cancelAnim, nil)
+	sh.Animate(ctx, interval, imgStream, nil)
 	close(imgStream)
 	waitgroup.Wait()
 }
 
-func OpenReader(filename string) (io.ReadCloser, error) {
+func openReader(filename string) (io.ReadCloser, error) {
 	if filename == "-" {
 		return ioutil.NopCloser(os.Stdin), nil
 	}
 	return os.Open(filename)
 }
 
-func OpenWriter(filename string) (io.WriteCloser, error) {
+func openWriter(filename string) (io.WriteCloser, error) {
 	if filename == "-" {
 		return nopCloseWriter{Writer: os.Stdout}, nil
 	}
@@ -148,6 +147,6 @@ func (nopCloseWriter) Close() error {
 	return nil
 }
 
-func PrintError(err error) {
+func printError(err error) {
 	fmt.Fprintln(os.Stderr, err)
 }
