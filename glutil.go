@@ -18,19 +18,23 @@ type GLDebugMessage struct {
 	Stack    string
 }
 
-func (dm GLDebugMessage) String() string {
-	var sev string
+func (dm GLDebugMessage) SeverityString() string {
 	switch dm.Severity {
 	case gl.DEBUG_SEVERITY_HIGH:
-		sev = "high"
+		return "high"
 	case gl.DEBUG_SEVERITY_MEDIUM:
-		sev = "medium"
+		return "medium"
 	case gl.DEBUG_SEVERITY_LOW:
-		sev = "low"
+		return "low"
 	case gl.DEBUG_SEVERITY_NOTIFICATION:
-		sev = "note"
+		return "note"
+	default:
+		return ""
 	}
-	return fmt.Sprintf("[%s] %s", sev, dm.Message)
+}
+
+func (dm GLDebugMessage) String() string {
+	return fmt.Sprintf("[%s] %s", dm.SeverityString(), dm.Message)
 }
 
 func GLDebugOutput() <-chan GLDebugMessage {

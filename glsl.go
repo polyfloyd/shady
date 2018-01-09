@@ -64,10 +64,8 @@ func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
 	debug := GLDebugOutput()
 	go func() {
 		for dm := range debug {
-			if dm.Severity == gl.DEBUG_SEVERITY_HIGH {
-				fmt.Fprintf(os.Stderr, "OpenGL severe: %s\n%s\n", dm.Message, dm.Stack)
-			} else {
-				fmt.Fprintf(os.Stderr, "%v\n", dm)
+			if dm.Severity != gl.DEBUG_SEVERITY_NOTIFICATION {
+				fmt.Fprintf(os.Stderr, "OpenGL %s: %s\n%s\n", dm.SeverityString(), dm.Message, dm.Stack)
 			}
 		}
 	}()
