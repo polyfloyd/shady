@@ -41,10 +41,25 @@ func Encode(writer io.Writer, img image.Image, format string) error {
 		return png.Encode(writer, img)
 	case "jpg":
 		return jpeg.Encode(writer, img, nil)
+	case "rgb24":
+		return EncodeRGB24(writer, img)
 	case "rgba32":
 		return EncodeRGBA32(writer, img)
 	}
 	return fmt.Errorf("Unknown output format: %q", format)
+}
+
+func EncodeRGB24(writer io.Writer, img image.Image) error {
+	bounds := img.Bounds()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			if _, err := writer.Write([]byte{byte(r / 256), byte(g / 256), byte(b / 256)}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func EncodeRGBA32(writer io.Writer, img image.Image) error {
