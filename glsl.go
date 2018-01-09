@@ -73,18 +73,22 @@ func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
 	}()
 
 	// Set up the render target.
+	// Framebuffer.
 	gl.GenFramebuffers(1, &sh.fbo)
+	gl.BindFramebuffer(gl.FRAMEBUFFER, sh.fbo)
+	// Color renderbuffer.
 	gl.GenRenderbuffers(1, &sh.rbo)
 	gl.BindRenderbuffer(gl.RENDERBUFFER, sh.rbo)
 	gl.RenderbufferStorage(gl.RENDERBUFFER, gl.RGBA8, int32(sh.w), int32(sh.h))
-	gl.BindFramebuffer(gl.FRAMEBUFFER, sh.fbo)
+
 	gl.FramebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, sh.rbo)
 	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
+	gl.ReadBuffer(gl.COLOR_ATTACHMENT0)
 
 	gl.GenBuffers(int32(len(sh.pbos)), &sh.pbos[0])
 	for _, bufID := range sh.pbos {
 		gl.BindBuffer(gl.PIXEL_PACK_BUFFER, bufID)
-		gl.BufferStorage(gl.PIXEL_PACK_BUFFER, int(sh.w*sh.h*4), nil, gl.STREAM_READ)
+		gl.BufferData(gl.PIXEL_PACK_BUFFER, int(sh.w*sh.h*4), nil, gl.DYNAMIC_READ)
 	}
 	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
 
@@ -95,7 +99,7 @@ func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
 		-1.0, 1.0, 0.0,
 		1.0, 1.0, 0.0,
 	}
-	gl.CreateBuffers(1, &sh.canvas)
+	gl.GenBuffers(1, &sh.canvas)
 	gl.BindBuffer(gl.ARRAY_BUFFER, sh.canvas)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
 
@@ -118,6 +122,7 @@ func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
 func (sh *Shader) downloadImage(pboIndex int) image.Image {
 	img := image.NewRGBA(image.Rect(0, 0, int(sh.w), int(sh.h)))
 	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, sh.pbos[pboIndex])
+	gl.ReadPixels(0, 0, int32(sh.w), int32(sh.h), gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	gl.GetBufferSubData(gl.PIXEL_PACK_BUFFER, 0, int(sh.w*sh.h*4), gl.Ptr(&img.Pix[0]))
 	return img
 }
