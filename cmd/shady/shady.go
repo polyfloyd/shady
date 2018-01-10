@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/polyfloyd/glsl"
+	"github.com/polyfloyd/shady"
 )
 
 func main() {
