@@ -9,7 +9,9 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -19,8 +21,7 @@ import (
 func main() {
 	inputFile := flag.String("i", "-", "The shader file to use. Will read from stdin by default")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
-	width := flag.Uint("w", 512, "The width of the rendered image")
-	height := flag.Uint("h", 512, "The height of the rendered image")
+	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image")
 	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
@@ -28,6 +29,13 @@ func main() {
 
 	if *numFrames != 0 && *framerate == 0 {
 		printError(fmt.Errorf("The numframes is set while the framerate is not set"))
+		return
+	}
+
+	// Figure out the dimensions of the display.
+	width, height, err := parseGeometry(*geometry)
+	if err != nil {
+		printError(err)
 		return
 	}
 
@@ -56,7 +64,7 @@ func main() {
 		return
 	}
 	// Compile the shader.
-	sh, err := glsl.NewShader(*width, *height, string(shaderSource))
+	sh, err := glsl.NewShader(width, height, string(shaderSource))
 	if err != nil {
 		printError(err)
 		return
@@ -123,6 +131,27 @@ func main() {
 	sh.Animate(ctx, interval, imgStream, nil)
 	close(imgStream)
 	waitgroup.Wait()
+}
+
+func parseGeometry(geom string) (uint, uint, error) {
+	if geom == "env" {
+		geom = os.Getenv("LEDCAT_GEOMETRY")
+		if geom == "" {
+			return 0, 0, fmt.Errorf("LEDCAT_GEOMETRY is empty while instructed to load the display geometry from the environment")
+		}
+	}
+
+	re := regexp.MustCompile("^(\\d+)x(\\d+)$")
+	matches := re.FindStringSubmatch(geom)
+	if matches == nil {
+		return 0, 0, fmt.Errorf("invalid geometry: %q", geom)
+	}
+	w, _ := strconv.ParseUint(matches[1], 10, 32)
+	h, _ := strconv.ParseUint(matches[2], 10, 32)
+	if w == 0 || h == 0 {
+		return 0, 0, fmt.Errorf("no geometry dimension can be 0, got (%d, %d)", w, h)
+	}
+	return uint(w), uint(h), nil
 }
 
 func openReader(filename string) (io.ReadCloser, error) {
