@@ -75,7 +75,8 @@ done
 Optionally, you could use something like gzip to reduce the file size.
 
 #### PlatformError: X11: Failed to open display
-Make sure X is running and `$DISPLAY` is set. Headless support is [TODO](#1).
+Make sure X is running and `$DISPLAY` is set. Headless support is
+[TODO](https://github.com/polyfloyd/shady/issues/1).
 
 If this is not possible or undesirable, animate to a file and play from that
 file in real time. [See above](#user-content-my-performance-is-really-bad).
