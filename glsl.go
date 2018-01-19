@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"image/color"
 	"os"
 	"sync"
 	"time"
@@ -177,7 +178,7 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 		select {
 		case <-ctx.Done():
 			return
-		case stream <- img:
+		case stream <- &Flip{Image: img}:
 		}
 	}
 }
@@ -190,4 +191,14 @@ func (sh *Shader) Close() error {
 	gl.DeleteBuffers(int32(len(sh.pbos)), &sh.pbos[0])
 	sh.win.Destroy()
 	return nil
+}
+
+// Flip wraps an image and flips it upside down.
+type Flip struct {
+	image.Image
+}
+
+func (flip *Flip) At(x, y int) color.Color {
+	h := flip.Bounds().Dy()
+	return flip.Image.At(x, h-y-1)
 }
