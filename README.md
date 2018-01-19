@@ -80,3 +80,17 @@ Make sure X is running and `$DISPLAY` is set. Headless support is
 
 If this is not possible or undesirable, animate to a file and play from that
 file in real time. [See above](#user-content-my-performance-is-really-bad).
+
+#### unexpected NEW_IDENTIFIER
+```
+Error compiling fragment shader:
+0:2(1): error: syntax error, unexpected NEW_IDENTIFIER
+```
+The above error could be caused by a `precision mediump float;` being present.
+Because this is an OpenGL ES directive, it is not supported. Try removing it or
+wrapping with a preprocessor macro:
+```glsl
+#ifdef GL_ES
+precision mediump float;
+#endif
+```
