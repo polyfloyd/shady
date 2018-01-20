@@ -56,6 +56,19 @@ export LEDCAT_GEOMETRY=128x128
 shady -i example.glsl -ofmt rgb24 -framerate 20 | ledcat --framerate 20 show
 ```
 
+### FFmpeg
+FFmpeg may be used to visualize the output:
+```
+# Render at 1024x768 at 20 fps and show it
+shady -i example.glsl -ofmt rgb24 -g 1024x768 -framerate 20 \
+  | ffplay -f rawvideo -pixel_format rgb24 -video_size 1024x768 -framerate 20 -
+
+# The same, but render 12 seconds to an MP4 file
+shady -i example.glsl -ofmt rgb24 -g 1024x768 -framerate 10 \
+  | ffmpeg -f rawvideo -pixel_format rgb24 -video_size 1024x768 \
+    -framerate 10 -t 12 -i - example.mp4
+```
+
 ### Troubleshooting
 #### My performance is really bad
 Some shaders can really ask a lot from a system, in these cases it may not be
