@@ -12,17 +12,24 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/encode"
 )
 
 func main() {
+	formatNames := make([]string, 0, len(encode.Formats))
+	for name := range encode.Formats {
+		formatNames = append(formatNames, name)
+	}
+
 	inputFile := flag.String("i", "-", "The shader file to use. Will read from stdin by default")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
-	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image")
+	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
 	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
 	flag.Parse()
@@ -39,16 +46,15 @@ func main() {
 		return
 	}
 
-	runtime.LockOSThread()
-
-	// Detect the output format.
-	format := *outputFormat
-	if format == "" {
-		format = glsl.DetectFormat(*outputFile)
-	}
-	if format == "" {
-		printError(fmt.Errorf("Unable to detect output format. Please set the -ofmt flag"))
-		return
+	var format encode.Format
+	var ok bool
+	if *outputFormat == "" {
+		if format, ok = encode.DetectFormat(*outputFile); !ok {
+			printError(fmt.Errorf("Unable to detect output format. Please set the -ofmt flag"))
+			return
+		}
+	} else if format, ok = encode.Formats[*outputFormat]; !ok {
+		printError(fmt.Errorf("Unknown output format: %q", *outputFile))
 	}
 
 	// Load the shader.
@@ -63,6 +69,11 @@ func main() {
 		printError(err)
 		return
 	}
+
+	// Lock this goroutine to the current thread. This is required because
+	// OpenGL contexts are bounds to threads.
+	runtime.LockOSThread()
+
 	// Compile the shader.
 	sh, err := glsl.NewShader(width, height, string(shaderSource))
 	if err != nil {
@@ -82,7 +93,7 @@ func main() {
 	if *framerate <= 0 {
 		img := sh.Image(nil)
 		// We're not dealing with an animation, just export a single image.
-		if err := glsl.Encode(outWriter, img, format); err != nil {
+		if err := format.Encode(outWriter, img); err != nil {
 			printError(err)
 			return
 		}
@@ -104,7 +115,7 @@ func main() {
 		cancel()
 	}()
 	go func() {
-		if err := glsl.EncodeAnim(outWriter, counterStream, format, interval); err != nil {
+		if err := format.EncodeAnimation(outWriter, counterStream, interval); err != nil {
 			printError(fmt.Errorf("Error animating: %v", err))
 			cancel()
 			go func() {
