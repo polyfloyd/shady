@@ -32,6 +32,7 @@ func main() {
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
 	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
+	verbose := flag.Bool("v", false, "Show verbose output about rendering")
 	flag.Parse()
 
 	if *numFrames != 0 && *framerate == 0 {
@@ -128,9 +129,25 @@ func main() {
 	}()
 	go func() {
 		defer close(counterStream)
+		lastFrame := time.Now()
 		var frame uint
 		for img := range imgStream {
+			renderTime := time.Since(lastFrame)
+			fps := 1.0 / (float64(renderTime) / float64(time.Second))
+			speed := float64(interval) / float64(renderTime)
+			lastFrame = time.Now()
 			frame++
+
+			if *verbose {
+				var frameTarget string
+				if *numFrames == 0 {
+					frameTarget = "∞"
+				} else {
+					frameTarget = fmt.Sprintf("%d", *numFrames)
+				}
+				fmt.Fprintf(os.Stderr, "\rfps=%.2f frames=%d/%s speed=%.2f", fps, frame, frameTarget, speed)
+			}
+
 			counterStream <- img
 			if frame == *numFrames {
 				cancel()
