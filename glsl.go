@@ -109,10 +109,12 @@ func NewShader(width, height uint, fragmentShader string, env Environment) (*Sha
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
 
 	// Set up the shader.
-	sh.program, err = linkProgram(map[uint32][]string{
+	sources := map[uint32][]string{
 		gl.VERTEX_SHADER:   {vertexShader},
 		gl.FRAGMENT_SHADER: {fragmentShader},
-	})
+	}
+	sources = env.Sources(sources)
+	sh.program, err = linkProgram(sources)
 	if err != nil {
 		return nil, err
 	}

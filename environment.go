@@ -12,6 +12,10 @@ type RenderState struct {
 }
 
 type Environment interface {
+	// Sources may inspect and modify the supplied shader sources to match the
+	// simulated environment.
+	Sources(sources map[uint32][]string) map[uint32][]string
+
 	// PreRender updates the program's uniform values for the next frame.
 	//
 	// sinceStart is the animation time elapsed since the first frame was

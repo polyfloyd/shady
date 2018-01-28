@@ -12,20 +12,19 @@ go get -u github.com/polyfloyd/shady/cmd/shady
 ```
 
 ### Writing Shaders
-Currently, only the shaders from [glslsandbox.com](http://glslsandbox.com/) are
-supported.
-
-The setup is a single fragment shader, like a regular fragments shader,
+The basic setup is a single fragment shader, like a regular fragments shader,
 calculates the color for each pixel. But instead of receiving vertex and normal
 and tranformation information from the vertex shader, it defines it's own
 algorithm for shapes.
 
-Besides `gl_FragCoord`, the following uniforms are available:
+#### GLSL Sandbox
+* http://glslsandbox.com/
+
+Besides `gl_FragCoord`, the following uniforms are available as input:
 * `uniform float time`: the time since startup in seconds
 * `uniform vec2 resolution`: the resolution of the display in pixels
 
-glslsandbox.com also exposes these uniforms, but are not (yet) supported by
-Shady:
+GLSL Sandbox also exposes these uniforms, but are not (yet) supported by Shady:
 * `uniform vec2 mouse`: the position of the mouse cursor relative to the bottom
   left corner. Shady is a CLI application so this will never be supported
 * `varying vec2 surfacePosition`: [???](https://github.com/mrdoob/glsl-sandbox/issues/45)
@@ -33,6 +32,15 @@ Shady:
 
 Check out [example.glsl](example.glsl) to see what a shader for this website
 looks like.
+
+#### ShaderToy
+* https://shadertoy.com/
+
+Currently, only the `iTime` and `iResolution` uniforms are supported. Other
+uniforms are defined, except the `iChannelX` ones.
+
+See also https://www.shadertoy.com/howto for info on how to write shaders for
+ShaderToy.
 
 
 ### Ledcat
