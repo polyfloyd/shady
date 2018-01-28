@@ -189,6 +189,9 @@ func main() {
 				break
 			}
 		}
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "\n")
+		}
 		waitgroup.Done()
 	}()
 	sh.Animate(ctx, interval, imgStream)
