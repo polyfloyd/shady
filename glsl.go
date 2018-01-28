@@ -31,11 +31,12 @@ type Shader struct {
 	pbos             [3]uint32
 
 	uniforms    map[string]Uniform
+	env         Environment
 	program     uint32
 	curBufIndex int
 }
 
-func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
+func NewShader(width, height uint, fragmentShader string, env Environment) (*Shader, error) {
 	var err error
 	glfwInitOnce.Do(func() {
 		err = glfw.Init()
@@ -54,7 +55,12 @@ func NewShader(width, height uint, fragmentShader string) (*Shader, error) {
 	if err != nil {
 		return nil, err
 	}
-	sh := &Shader{win: win, w: width, h: height}
+	sh := &Shader{
+		win: win,
+		w:   width,
+		h:   height,
+		env: env,
+	}
 	sh.win.MakeContextCurrent()
 
 	// Initialize OpenGL
@@ -126,50 +132,34 @@ func (sh *Shader) downloadImage(pboIndex int) image.Image {
 	return img
 }
 
-func (sh *Shader) drawImage(pboIndex int, uniformValues map[string]func(int32)) {
-	for name, setValue := range uniformValues {
-		if u, ok := sh.uniforms[name]; ok {
-			setValue(u.Location)
-		}
-	}
+func (sh *Shader) drawImage(pboIndex int) {
 	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 	// Start the transfer of the image to the PBO.
 	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, sh.pbos[pboIndex])
 	gl.ReadPixels(0, 0, int32(sh.w), int32(sh.h), gl.RGBA, gl.UNSIGNED_BYTE, nil)
 }
 
-func (sh *Shader) Image(uniformValues map[string]func(int32)) image.Image {
-	if uniformValues == nil {
-		uniformValues = map[string]func(int32){}
-	}
-	if _, ok := uniformValues["resolution"]; !ok {
-		uniformValues["resolution"] = func(loc int32) {
-			gl.Uniform2f(loc, float32(sh.w), float32(sh.h))
-		}
-	}
-
-	sh.drawImage(0, uniformValues)
+func (sh *Shader) Image() image.Image {
+	sh.env.PreRender(sh.uniforms, RenderState{
+		Time:         0,
+		CanvasWidth:  sh.w,
+		CanvasHeight: sh.h,
+	})
+	sh.drawImage(0)
 	return sh.downloadImage(0)
 }
 
-func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream chan<- image.Image, uniformValues map[string]func(int32)) {
-	if uniformValues == nil {
-		uniformValues = map[string]func(int32){}
-	}
-
+func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream chan<- image.Image) {
 	var t time.Duration
 	for frame := uint64(0); ; frame++ {
-		if _, ok := uniformValues["resolution"]; !ok {
-			uniformValues["resolution"] = func(loc int32) {
-				gl.Uniform2f(loc, float32(sh.w), float32(sh.h))
-			}
-		}
-		uniformValues["time"] = func(loc int32) {
-			gl.Uniform1f(loc, float32(t)/float32(time.Second))
-		}
+		sh.env.PreRender(sh.uniforms, RenderState{
+			Time:         t,
+			CanvasWidth:  sh.w,
+			CanvasHeight: sh.h,
+		})
 		t += interval
 
-		sh.drawImage(int(frame%uint64(len(sh.pbos))), uniformValues)
+		sh.drawImage(int(frame % uint64(len(sh.pbos))))
 		if frame < uint64(len(sh.pbos)) {
 			continue
 		}

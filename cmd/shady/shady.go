@@ -75,8 +75,10 @@ func main() {
 	// OpenGL contexts are bounds to threads.
 	runtime.LockOSThread()
 
+	env := GLSLSandbox{}
+
 	// Compile the shader.
-	sh, err := glsl.NewShader(width, height, string(shaderSource))
+	sh, err := glsl.NewShader(width, height, string(shaderSource), env)
 	if err != nil {
 		printError(err)
 		return
@@ -92,7 +94,7 @@ func main() {
 	defer outWriter.Close()
 
 	if *framerate <= 0 {
-		img := sh.Image(nil)
+		img := sh.Image()
 		// We're not dealing with an animation, just export a single image.
 		if err := format.Encode(outWriter, img); err != nil {
 			printError(err)
@@ -156,7 +158,7 @@ func main() {
 		}
 		waitgroup.Done()
 	}()
-	sh.Animate(ctx, interval, imgStream, nil)
+	sh.Animate(ctx, interval, imgStream)
 	close(imgStream)
 	waitgroup.Wait()
 }
