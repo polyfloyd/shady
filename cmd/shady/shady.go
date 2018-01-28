@@ -33,12 +33,28 @@ func main() {
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
 	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
+	duration := flag.Uint("duration", 0, "Limit the animation to the specified number of seconds. No limit is set by default")
 	verbose := flag.Bool("v", false, "Show verbose output about rendering")
 	flag.Parse()
 
-	if *numFrames != 0 && *framerate == 0 {
-		fmt.Fprintf(os.Stderr, "The numframes is set while the framerate is not set\n")
+	if *duration != 0 && *numFrames != 0 {
+		fmt.Fprintf(os.Stderr, "-duration and -numframes are mutually exclusive\n")
 		return
+	}
+	var animateNumFrames uint
+	if *numFrames != 0 {
+		if *framerate == 0 {
+			fmt.Fprintf(os.Stderr, "-numframes is set while -framerate is not set\n")
+			return
+		}
+		animateNumFrames = *numFrames
+	}
+	if *duration != 0 {
+		if *framerate == 0 {
+			fmt.Fprintf(os.Stderr, "-duration is set while -framerate is not set\n")
+			return
+		}
+		animateNumFrames = uint(float64(*duration) * *framerate)
 	}
 
 	// Figure out the dimensions of the display.
@@ -158,16 +174,16 @@ func main() {
 
 			if *verbose {
 				var frameTarget string
-				if *numFrames == 0 {
+				if animateNumFrames == 0 {
 					frameTarget = "∞"
 				} else {
-					frameTarget = fmt.Sprintf("%d", *numFrames)
+					frameTarget = fmt.Sprintf("%d", animateNumFrames)
 				}
 				fmt.Fprintf(os.Stderr, "\rfps=%.2f frames=%d/%s speed=%.2f", fps, frame, frameTarget, speed)
 			}
 
 			counterStream <- img
-			if frame == *numFrames {
+			if frame == animateNumFrames {
 				cancel()
 				break
 			}
