@@ -39,20 +39,20 @@ func main() {
 
 	if *duration != 0 && *numFrames != 0 {
 		fmt.Fprintf(os.Stderr, "-duration and -numframes are mutually exclusive\n")
-		return
+		os.Exit(1)
 	}
 	var animateNumFrames uint
 	if *numFrames != 0 {
 		if *framerate == 0 {
 			fmt.Fprintf(os.Stderr, "-numframes is set while -framerate is not set\n")
-			return
+			os.Exit(1)
 		}
 		animateNumFrames = *numFrames
 	}
 	if *duration != 0 {
 		if *framerate == 0 {
 			fmt.Fprintf(os.Stderr, "-duration is set while -framerate is not set\n")
-			return
+			os.Exit(1)
 		}
 		animateNumFrames = uint(float64(*duration) * *framerate)
 	}
@@ -61,7 +61,7 @@ func main() {
 	width, height, err := parseGeometry(*geometry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	var format encode.Format
@@ -69,23 +69,24 @@ func main() {
 	if *outputFormat == "" {
 		if format, ok = encode.DetectFormat(*outputFile); !ok {
 			fmt.Fprintf(os.Stderr, "Unable to detect output format. Please set the -ofmt flag\n")
-			return
+			os.Exit(1)
 		}
 	} else if format, ok = encode.Formats[*outputFormat]; !ok {
 		fmt.Fprintf(os.Stderr, "Unknown output format: %q", *outputFile)
+		os.Exit(1)
 	}
 
 	// Load the shader.
 	shaderSourceFile, err := openReader(*inputFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		os.Exit(1)
 	}
 	defer shaderSourceFile.Close()
 	shaderSource, err := ioutil.ReadAll(shaderSourceFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	// Lock this goroutine to the current thread. This is required because
@@ -103,7 +104,7 @@ func main() {
 		env, ok = DetectEnvironment(string(shaderSource))
 		if !ok {
 			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env")
-			return
+			os.Exit(1)
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown environment: %q", *envName)
@@ -113,7 +114,7 @@ func main() {
 	sh, err := glsl.NewShader(width, height, string(shaderSource), env)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		os.Exit(1)
 	}
 	defer sh.Close()
 
@@ -121,7 +122,7 @@ func main() {
 	outWriter, err := openWriter(*outputFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		os.Exit(1)
 	}
 	defer outWriter.Close()
 
@@ -130,7 +131,7 @@ func main() {
 		// We're not dealing with an animation, just export a single image.
 		if err := format.Encode(outWriter, img); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
-			return
+			os.Exit(1)
 		}
 		return
 	}
