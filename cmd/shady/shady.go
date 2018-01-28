@@ -29,7 +29,7 @@ func main() {
 	inputFile := flag.String("i", "-", "The shader file to use. Will read from stdin by default")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
-	envName := flag.String("env", "glslsandbox", "The environment (aka website) to simulate. Valid values are \"glslsandbox\" and \"shadertoy\"")
+	envName := flag.String("env", "", "The environment (aka website) to simulate. Valid values are \"glslsandbox\", \"shadertoy\" or \"\" to autodetect")
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
 	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
@@ -82,6 +82,13 @@ func main() {
 		env = GLSLSandbox{}
 	case "shadertoy":
 		env = ShaderToy{}
+	case "":
+		var ok bool
+		env, ok = DetectEnvironment(string(shaderSource))
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env")
+			return
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown environment: %q", *envName)
 	}

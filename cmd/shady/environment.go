@@ -1,14 +1,14 @@
 package main
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/polyfloyd/shady"
 )
 
-// GLSLSandbox implements the Environment interface to simulate the canvas of
-// glslsandbox.com.
+// GLSLSandbox implements the Environment interface to simulate the canvas of glslsandbox.com.
 type GLSLSandbox struct{}
 
 func (GLSLSandbox) Sources(sources map[uint32][]string) map[uint32][]string {
@@ -57,4 +57,20 @@ func (ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderSt
 	if loc, ok := uniforms["iTime"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
+}
+
+func DetectEnvironment(shaderSource string) (glsl.Environment, bool) {
+	// Quick and dirty: run some regular expressions on the source to infer the
+	// environment.
+	reGLSLSandbox := regexp.MustCompile("uniform\\s+vec2\\s+resolution")
+	if reGLSLSandbox.MatchString(shaderSource) {
+		return GLSLSandbox{}, true
+	}
+	// The mainImage function should always be present in ShaderToy image
+	// shaders.
+	reShaderToy := regexp.MustCompile("void\\s+mainImage\\s*\\(\\s*out\\s*vec4\\s*fragColor,\\s*in\\s*vec2\\s*fragCoord\\s*\\)")
+	if reShaderToy.MatchString(shaderSource) {
+		return ShaderToy{}, true
+	}
+	return nil, false
 }
