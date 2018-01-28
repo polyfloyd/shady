@@ -17,7 +17,7 @@ func (GLSLSandbox) Sources(sources map[uint32][]string) map[uint32][]string {
 
 func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
 	if loc, ok := uniforms["resolution"]; ok {
-		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasWidth))
+		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))
 	}
 	if loc, ok := uniforms["time"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
@@ -52,7 +52,7 @@ func (ShaderToy) Sources(sources map[uint32][]string) map[uint32][]string {
 
 func (ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
 	if loc, ok := uniforms["iResolution"]; ok {
-		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasWidth), 0.0)
+		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 0.0)
 	}
 	if loc, ok := uniforms["iTime"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
