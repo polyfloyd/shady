@@ -37,14 +37,14 @@ func main() {
 	flag.Parse()
 
 	if *numFrames != 0 && *framerate == 0 {
-		printError(fmt.Errorf("The numframes is set while the framerate is not set"))
+		fmt.Fprintf(os.Stderr, "The numframes is set while the framerate is not set\n")
 		return
 	}
 
 	// Figure out the dimensions of the display.
 	width, height, err := parseGeometry(*geometry)
 	if err != nil {
-		printError(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 
@@ -52,23 +52,23 @@ func main() {
 	var ok bool
 	if *outputFormat == "" {
 		if format, ok = encode.DetectFormat(*outputFile); !ok {
-			printError(fmt.Errorf("Unable to detect output format. Please set the -ofmt flag"))
+			fmt.Fprintf(os.Stderr, "Unable to detect output format. Please set the -ofmt flag\n")
 			return
 		}
 	} else if format, ok = encode.Formats[*outputFormat]; !ok {
-		printError(fmt.Errorf("Unknown output format: %q", *outputFile))
+		fmt.Fprintf(os.Stderr, "Unknown output format: %q", *outputFile)
 	}
 
 	// Load the shader.
 	shaderSourceFile, err := openReader(*inputFile)
 	if err != nil {
-		printError(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 	defer shaderSourceFile.Close()
 	shaderSource, err := ioutil.ReadAll(shaderSourceFile)
 	if err != nil {
-		printError(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 
@@ -83,13 +83,13 @@ func main() {
 	case "shadertoy":
 		env = ShaderToy{}
 	default:
-		printError(fmt.Errorf("Unknown environment: %q", *envName))
+		fmt.Fprintf(os.Stderr, "Unknown environment: %q", *envName)
 	}
 
 	// Compile the shader.
 	sh, err := glsl.NewShader(width, height, string(shaderSource), env)
 	if err != nil {
-		printError(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 	defer sh.Close()
@@ -97,7 +97,7 @@ func main() {
 	// Open the output.
 	outWriter, err := openWriter(*outputFile)
 	if err != nil {
-		printError(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 	defer outWriter.Close()
@@ -106,7 +106,7 @@ func main() {
 		img := sh.Image()
 		// We're not dealing with an animation, just export a single image.
 		if err := format.Encode(outWriter, img); err != nil {
-			printError(err)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return
 		}
 		return
@@ -128,7 +128,7 @@ func main() {
 	}()
 	go func() {
 		if err := format.EncodeAnimation(outWriter, counterStream, interval); err != nil {
-			printError(fmt.Errorf("Error animating: %v", err))
+			fmt.Fprintf(os.Stderr, "Error animating: %v", err)
 			cancel()
 			go func() {
 				// Prevent deadlocking the counter routine.
@@ -213,8 +213,4 @@ type nopCloseWriter struct {
 
 func (nopCloseWriter) Close() error {
 	return nil
-}
-
-func printError(err error) {
-	fmt.Fprintln(os.Stderr, err)
 }
