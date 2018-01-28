@@ -1,5 +1,19 @@
+# Editor files
 *.swp
 *.swo
 
+# Build output
 /shady
 /vendor/
+
+# Custom shaders
+/shaders/*
+!/shaders/Makefile
+!/shaders/example.glsl
+
+# Render output
+*.gif
+*.mp4
+*.rgb
+*.rgb.gz
+*.webm

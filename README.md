@@ -30,7 +30,7 @@ GLSL Sandbox also exposes these uniforms, but are not (yet) supported by Shady:
 * `varying vec2 surfacePosition`: [???](https://github.com/mrdoob/glsl-sandbox/issues/45)
 * `uniform sampler2D backbuffer`: a texture storing previously rendered image
 
-Check out [example.glsl](example.glsl) to see what a shader for this website
+Check out [example.glsl](shaders/example.glsl) to see what a shader for this website
 looks like.
 
 #### ShaderToy
