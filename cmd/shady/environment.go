@@ -68,7 +68,7 @@ func DetectEnvironment(shaderSource string) (glsl.Environment, bool) {
 	}
 	// The mainImage function should always be present in ShaderToy image
 	// shaders.
-	reShaderToy := regexp.MustCompile("void\\s+mainImage\\s*\\(\\s*out\\s*vec4\\s*fragColor,\\s*in\\s*vec2\\s*fragCoord\\s*\\)")
+	reShaderToy := regexp.MustCompile("void\\s+mainImage\\s*\\(\\s*out\\s*vec4\\s*\\w+,\\s*in\\s*vec2\\s*\\w\\s*\\)")
 	if reShaderToy.MatchString(shaderSource) {
 		return ShaderToy{}, true
 	}
