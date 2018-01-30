@@ -14,7 +14,7 @@ go get -u github.com/polyfloyd/shady/cmd/shady
 ### Writing Shaders
 The basic setup is a single fragment shader, like a regular fragments shader,
 calculates the color for each pixel. But instead of receiving vertex and normal
-and tranformation information from the vertex shader, it defines it's own
+and transformation information from the vertex shader, it defines it's own
 algorithm for shapes.
 
 #### GLSL Sandbox
