@@ -12,6 +12,15 @@ import (
 type GLSLSandbox struct{}
 
 func (GLSLSandbox) Sources(sources map[uint32][]string) map[uint32][]string {
+	sources[gl.VERTEX_SHADER] = append(sources[gl.VERTEX_SHADER], `
+		attribute vec3 vert;
+		varying vec2 surfacePosition;
+
+		void main(void) {
+			surfacePosition = vert.xy;
+			gl_Position = vec4(vert, 1.0);
+		}
+	`)
 	return sources
 }
 
@@ -22,11 +31,21 @@ func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.Render
 	if loc, ok := uniforms["time"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
+	if loc, ok := uniforms["surfaceSize"]; ok {
+		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))
+	}
 }
 
 type ShaderToy struct{}
 
 func (ShaderToy) Sources(sources map[uint32][]string) map[uint32][]string {
+	sources[gl.VERTEX_SHADER] = append(sources[gl.VERTEX_SHADER], `
+		attribute vec3 vert;
+		void main(void) {
+			gl_Position = vec4(vert, 1.0);
+		}
+	`)
+
 	glueHead := `
 		uniform vec3 iResolution;
 		uniform float iTime;

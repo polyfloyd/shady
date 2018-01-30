@@ -13,13 +13,6 @@ import (
 	"github.com/go-gl/glfw/v3.1/glfw"
 )
 
-const vertexShader = `
-	attribute vec3 vert;
-	void main(void) {
-		gl_Position = vec4(vert, 1.0);
-	}
-`
-
 var glfwInitOnce sync.Once
 
 type Shader struct {
@@ -36,7 +29,7 @@ type Shader struct {
 	curBufIndex int
 }
 
-func NewShader(width, height uint, fragmentShader string, env Environment) (*Shader, error) {
+func NewShader(width, height uint, sources map[uint32][]string, env Environment) (*Shader, error) {
 	var err error
 	glfwInitOnce.Do(func() {
 		err = glfw.Init()
@@ -109,10 +102,6 @@ func NewShader(width, height uint, fragmentShader string, env Environment) (*Sha
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
 
 	// Set up the shader.
-	sources := map[uint32][]string{
-		gl.VERTEX_SHADER:   {vertexShader},
-		gl.FRAGMENT_SHADER: {fragmentShader},
-	}
 	sources = env.Sources(sources)
 	sh.program, err = linkProgram(sources)
 	if err != nil {

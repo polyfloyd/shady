@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/polyfloyd/shady"
 	"github.com/polyfloyd/shady/encode"
 )
@@ -111,7 +112,10 @@ func main() {
 	}
 
 	// Compile the shader.
-	sh, err := glsl.NewShader(width, height, string(shaderSource), env)
+	sources := map[uint32][]string{
+		gl.FRAGMENT_SHADER: {string(shaderSource)},
+	}
+	sh, err := glsl.NewShader(width, height, sources, env)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)

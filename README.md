@@ -20,14 +20,15 @@ algorithm for shapes.
 #### GLSL Sandbox
 * http://glslsandbox.com/
 
-Besides `gl_FragCoord`, the following uniforms are available as input:
+Besides `gl_FragCoord`, the following inputs are available:
 * `uniform float time`: the time since startup in seconds
 * `uniform vec2 resolution`: the resolution of the display in pixels
+* `varying vec2 surfacePosition`: the panning position. For backwards compatibility.
+* `varying vec2 surfaceSize`:  the resolution after zooming. For backwards compatibility.
 
 GLSL Sandbox also exposes these uniforms, but are not (yet) supported by Shady:
 * `uniform vec2 mouse`: the position of the mouse cursor relative to the bottom
   left corner. Shady is a CLI application so this will never be supported
-* `varying vec2 surfacePosition`: [???](https://github.com/mrdoob/glsl-sandbox/issues/45)
 * `uniform sampler2D backbuffer`: a texture storing previously rendered image
 
 Check out [example.glsl](shaders/example.glsl) to see what a shader for this website
