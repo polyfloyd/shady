@@ -65,7 +65,7 @@ func NewShader(width, height uint, sources map[uint32][]string, env Environment)
 	go func() {
 		for dm := range debug {
 			if dm.Severity != gl.DEBUG_SEVERITY_NOTIFICATION {
-				fmt.Fprintf(os.Stderr, "OpenGL %s: %s\n%s\n", dm.SeverityString(), dm.Message, dm.Stack)
+				fmt.Fprintf(os.Stderr, "OpenGL %s: %s\n", dm.SeverityString(), dm.Message)
 			}
 		}
 	}()
