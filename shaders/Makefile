@@ -21,13 +21,15 @@ VIDEOFPS=20
 VIDEOGEOM=1366x768
 VIDEOSECONDS=20
 
-SHADY=../shady
+GODIR=..
+SHADY=$(GODIR)/shady
 FFMPEG=ffmpeg
 
 SRCDIR := .
 RGBDIR := ./rgb
 VIDEODIR := ./video
 
+GOFILES := $(shell find $(GODIR) -name '*.go')
 SHADERFILES := $(shell find $(SRCDIR) -name '*.glsl')
 RGBFILES   := $(SHADERFILES:$(SRCDIR)/%.glsl=$(RGBDIR)/%.rgb.gz)
 VIDEOFILES := $(SHADERFILES:$(SRCDIR)/%.glsl=$(VIDEODIR)/%.mp4)
@@ -41,18 +43,19 @@ all: rgb video
 rgb: $(RGBFILES)
 video: $(VIDEOFILES)
 
-$SHADY:
+$(SHADY): $(GOFILES)
+	$(E)" [$(COLOR_COMPILE)GO$(COLOR_RESET)] $@"
 	$(Q)cd ./.. && go build ./cmd/shady/
 
-$(RGBDIR)/%.rgb.gz: $(SRCDIR)/%.glsl
+$(RGBDIR)/%.rgb.gz: $(SRCDIR)/%.glsl $(SHADY)
 	$(E)" [$(COLOR_RGB)RGB$(COLOR_RESET)] $@"
 	$(Q)mkdir -p `dirname $@`
 	$(Q)$(SHADY) -v -i $< -g $(RGBGEOM) -framerate $(RGBFPS) -duration $(RGBSECONDS) -ofmt rgb24 | gzip > $@
 
-$(VIDEODIR)/%.mp4: $(SRCDIR)/%.glsl
+$(VIDEODIR)/%.mp4: $(SRCDIR)/%.glsl $(SHADY)
 	$(E)" [$(COLOR_VIDEO)VIDEO$(COLOR_RESET)] $@"
 	$(Q)mkdir -p `dirname $@`
 	$(Q)$(SHADY) -i $< -g $(VIDEOGEOM) -framerate $(VIDEOFPS) -duration $(VIDEOSECONDS) -ofmt rgb24 | \
 	$(FFMPEG) -f rawvideo -pixel_format rgb24 -video_size $(VIDEOGEOM) \
 		-framerate $(VIDEOFPS) -t $(VIDEOSECONDS) -i - -quality good -cpu-used 0 \
-		-qmin 10 -qmax 42 -threads 8 $@
+		-qmin 10 -qmax 42 -threads 8 -y $@
