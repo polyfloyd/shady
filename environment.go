@@ -9,6 +9,8 @@ type RenderState struct {
 
 	CanvasWidth  uint
 	CanvasHeight uint
+
+	PreviousFrameTexID uint32
 }
 
 type Environment interface {

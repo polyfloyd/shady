@@ -25,13 +25,12 @@ algorithm for shapes.
 Besides `gl_FragCoord`, the following inputs are available:
 * `uniform float time`: the time since startup in seconds
 * `uniform vec2 resolution`: the resolution of the display in pixels
-* `varying vec2 surfacePosition`: the panning position. For backwards compatibility.
-* `varying vec2 surfaceSize`:  the resolution after zooming. For backwards compatibility.
-
-GLSL Sandbox also exposes these uniforms, but are not (yet) supported by Shady:
+* `uniform sampler2D backbuffer`: a texture storing the previously rendered image
+* `varying vec2 surfacePosition`: the panning position. For backwards compatibility
+* `varying vec2 surfaceSize`:  the resolution after zooming. For backwards compatibility
 * `uniform vec2 mouse`: the position of the mouse cursor relative to the bottom
-  left corner. Shady is a CLI application so this will never be supported
-* `uniform sampler2D backbuffer`: a texture storing previously rendered image
+  left corner. Shady is a CLI application so this will never be fully
+  supported. However, the value is set to the center of the display.
 
 Check out [example.glsl](shaders/example.glsl) to see what a shader for this website
 looks like.
