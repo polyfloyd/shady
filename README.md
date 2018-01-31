@@ -1,5 +1,7 @@
 Shady
 =====
+[![Build Status](https://travis-ci.org/polyfloyd/shady.svg)](https://travis-ci.org/polyfloyd/shady)
+[![Go Report Card](https://goreportcard.com/badge/github.com/polyfloyd/shady)](https://goreportcard.com/report/github.com/polyfloyd/shady)
 
 Shady is a nifty CLI tool for rendering GLSL fragment shaders for easy
 development and hacking.

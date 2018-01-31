@@ -1,0 +1,22 @@
+language: go
+go:
+  - stable
+  - master
+
+matrix:
+  allow_failures:
+    - go: master
+
+install:
+  - sudo apt-get install libxrandr-dev libxcursor-dev libxinerama-dev libxi-dev
+  - go get -u github.com/golang/dep/cmd/dep
+  - go get -u github.com/golang/lint/golint
+
+before_script:
+  - dep ensure
+script:
+  - gofmt -s -d .
+  - go build ./cmd/shady/
+  - go test -test.v -race ./...
+  - go vet ./...
+  - golint -min_confidence 0.3 $(go list ./...)
