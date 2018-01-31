@@ -1,4 +1,4 @@
-package glsl
+package main
 
 import (
 	"context"
@@ -6,6 +6,9 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/polyfloyd/shady"
 )
 
 const shaderPlain = `
@@ -19,6 +22,8 @@ const shaderWave = `
 	}
 `
 
+var env = GLSLSandbox{}
+
 var sources = map[string]string{
 	"plain": shaderPlain,
 	"wave":  shaderWave,
@@ -30,7 +35,9 @@ func BenchmarkCompile(b *testing.B) {
 			runtime.LockOSThread()
 
 			for n := 0; n < b.N; n++ {
-				shader, err := NewShader(512, 512, source)
+				shader, err := glsl.NewShader(512, 512, map[uint32][]string{
+					gl.FRAGMENT_SHADER: {source},
+				}, env)
 				if err != nil {
 					b.Log(err)
 					b.SkipNow()
@@ -46,7 +53,9 @@ func BenchmarkRenderImage(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
-			shader, err := NewShader(512, 512, source)
+			shader, err := glsl.NewShader(512, 512, map[uint32][]string{
+				gl.FRAGMENT_SHADER: {source},
+			}, env)
 			if err != nil {
 				b.Log(err)
 				b.SkipNow()
@@ -55,7 +64,7 @@ func BenchmarkRenderImage(b *testing.B) {
 
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
-				shader.Image(nil)
+				shader.Image()
 			}
 		})
 	}
@@ -66,7 +75,9 @@ func BenchmarkRenderAnimation(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
-			shader, err := NewShader(512, 512, source)
+			shader, err := glsl.NewShader(512, 512, map[uint32][]string{
+				gl.FRAGMENT_SHADER: {source},
+			}, env)
 			if err != nil {
 				b.Log(err)
 				b.SkipNow()
@@ -82,7 +93,7 @@ func BenchmarkRenderAnimation(b *testing.B) {
 				cancel()
 			}()
 			b.ResetTimer()
-			shader.Animate(ctx, time.Millisecond, stream, nil)
+			shader.Animate(ctx, time.Millisecond, stream)
 			close(stream)
 		})
 	}
