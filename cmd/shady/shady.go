@@ -100,14 +100,14 @@ func main() {
 			Source: string(shaderSource),
 		}
 	case "shadertoy":
-		env = ShaderToy{
+		env = &ShaderToy{
 			Source: string(shaderSource),
 		}
 	case "":
 		var ok bool
 		env, ok = DetectEnvironment(string(shaderSource))
 		if !ok {
-			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env")
+			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env\n")
 			os.Exit(1)
 		}
 	default:

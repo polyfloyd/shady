@@ -39,7 +39,34 @@ looks like.
 * https://shadertoy.com/
 
 Currently, only the `iTime` and `iResolution` uniforms are supported. Other
-uniforms are defined, except the `iChannelX` ones.
+uniforms are defined.
+
+It is possible use resources like images, videos and audio from shaders in
+this environment by using the `iChannelX` samplers. On the website, one can
+select this resource input mapping using dialogs. This implementation requires
+these mappings to be specified in the shader source. When this is done, the
+uniform is declared automatically.
+
+Mappings are declared in a special comment that is parsed by shady. These are
+typically inserted at the top of the file. It's format is:
+```glsl
+// map <uniform name>=<namespace>:<value>
+```
+
+`uniform name` is the name of the sampler uniform that is inserted into the
+source of the fragment shader. `namespace` specifies how `value` should be
+interpreted. The `builtin` namespace gives access to the presets that can be
+found on ShaderToy.
+
+Accepted values for `builtin` are:
+* `RGBA Noise Small`
+* `RGBA Noise Medium`
+
+Example: Enable the sampler named `iChannel0` as a texture with the builtin
+"RGBA Noise Medium" preset:
+```glsl
+// map iChannel0=builtin:RGBA Noise Medium
+```
 
 See also https://www.shadertoy.com/howto for info on how to write shaders for
 ShaderToy.

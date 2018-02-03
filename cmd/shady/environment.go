@@ -29,6 +29,8 @@ func (gs GLSLSandbox) Sources() map[glsl.Stage][]string {
 	}
 }
 
+func (GLSLSandbox) Setup() error { return nil }
+
 func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
 	if loc, ok := uniforms["resolution"]; ok {
 		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))
@@ -60,7 +62,7 @@ func DetectEnvironment(shaderSource string) (glsl.Environment, bool) {
 	// shaders.
 	reShaderToy := regexp.MustCompile("void\\s+mainImage\\s*\\(\\s*out\\s+vec4\\s+\\w+\\s*,\\s*(?:in)?\\s+vec2\\s+\\w+\\s*\\)")
 	if reShaderToy.MatchString(shaderSource) {
-		return ShaderToy{Source: shaderSource}, true
+		return &ShaderToy{Source: shaderSource}, true
 	}
 	return nil, false
 }

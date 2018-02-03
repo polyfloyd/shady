@@ -16,7 +16,7 @@ func TestDetectEnvironmentShaderToy(t *testing.T) {
 		if !ok {
 			t.Fatalf("unable to detect environment from source: %q", s)
 		}
-		if _, ok := env.(ShaderToy); !ok {
+		if _, ok := env.(*ShaderToy); !ok {
 			t.Fatalf("detect environment is not ShaderToy for source: %q", s)
 		}
 	}

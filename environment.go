@@ -30,6 +30,10 @@ type Environment interface {
 	// Multiple shader sources are combined per stage.
 	Sources() map[Stage][]string
 
+	// Setup may be used to initialize any OpenGL state before the first frame
+	// is rendered.
+	Setup() error
+
 	// PreRender updates the program's uniform values for each next frame.
 	//
 	// sinceStart is the animation time elapsed since the first frame was

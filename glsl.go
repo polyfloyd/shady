@@ -112,6 +112,10 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, sh.canvas)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
 
+	if err := env.Setup(); err != nil {
+		return nil, fmt.Errorf("error setting up environment: %v", err)
+	}
+
 	// Set up the shader.
 	rawSources := env.Sources()
 
