@@ -56,7 +56,8 @@ typically inserted at the top of the file. It's format is:
 `uniform name` is the name of the sampler uniform that is inserted into the
 source of the fragment shader. `namespace` specifies how `value` should be
 interpreted. The `builtin` namespace gives access to the presets that can be
-found on ShaderToy.
+found on ShaderToy. Setting the namespace to `image` interprets the value as a
+path relative to the shader source file to use as texture.
 
 Accepted values for `builtin` are:
 * `RGBA Noise Small`
@@ -66,6 +67,12 @@ Example: Enable the sampler named `iChannel0` as a texture with the builtin
 "RGBA Noise Medium" preset:
 ```glsl
 // map iChannel0=builtin:RGBA Noise Medium
+```
+
+Example: Map `iChannel1` to an image referenced by a path relative to the
+shader source file. Image files become sampler2D type uniforms.
+```glsl
+// map iChannel1=image:image.png
 ```
 
 See also https://www.shadertoy.com/howto for info on how to write shaders for

@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/draw"
+	_ "image/jpeg"
+	_ "image/png"
 	"math/rand"
 	"os"
 	"regexp"
@@ -127,6 +130,8 @@ func (m mapping) SamplerType() (string, bool) {
 		}
 	}
 	switch m.Namespace {
+	case "image":
+		return "sampler2D", true
 	default:
 		return "", false
 	}
@@ -144,6 +149,17 @@ func (m mapping) Resource() (resource, error) {
 		}
 	}
 	switch m.Namespace {
+	case "image":
+		fd, err := os.Open(m.Value)
+		if err != nil {
+			return nil, err
+		}
+		defer fd.Close()
+		img, _, err := image.Decode(fd)
+		if err != nil {
+			return nil, err
+		}
+		return newImageTexture(img, m.Name)
 	default:
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
 	}
@@ -169,7 +185,8 @@ func newImageTexture(img image.Image, uniformName string) (*imageTexture, error)
 	if i, ok := img.(*image.RGBA); ok {
 		rgbaImg = i
 	} else {
-		panic("UNIMPLEMENTED")
+		rgbaImg = image.NewRGBA(img.Bounds())
+		draw.Draw(rgbaImg, img.Bounds(), img, image.Point{X: 0, Y: 0}, draw.Over)
 	}
 
 	gl.TexImage2D(
