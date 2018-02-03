@@ -7,6 +7,7 @@ import (
 func TestDetectEnvironmentShaderToy(t *testing.T) {
 	sources := []string{
 		`void mainImage( out vec4 fragColor, in vec2 fragCoord ) { }`,
+		`void mainImage( out vec4 fragColor, vec2 fragCoord )`,
 		`void mainImage(out vec4 foo,in vec2 bar){}`,
 		`void   mainImage  (  out  vec4  o  ,  in   vec2  i  )  {  }`,
 	}
