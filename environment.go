@@ -1,8 +1,41 @@
 package glsl
 
 import (
+	"fmt"
 	"time"
+
+	"github.com/go-gl/gl/v3.3-core/gl"
 )
+
+type Stage string
+
+const (
+	StageVertex   = "vert"
+	StageFragment = "frag"
+)
+
+func (stage Stage) glEnum() (uint32, error) {
+	switch stage {
+	case StageVertex:
+		return gl.VERTEX_SHADER, nil
+	case StageFragment:
+		return gl.FRAGMENT_SHADER, nil
+	default:
+		return 0, fmt.Errorf("invalid pipeline stage: %q")
+	}
+}
+
+type Environment interface {
+	// Sources should return the shader sources mapped by their pipeline stage.
+	// Multiple shader sources are combined per stage.
+	Sources() map[Stage][]string
+
+	// PreRender updates the program's uniform values for each next frame.
+	//
+	// sinceStart is the animation time elapsed since the first frame was
+	// rendered.
+	PreRender(uniforms map[string]Uniform, state RenderState)
+}
 
 type RenderState struct {
 	Time time.Duration
@@ -11,16 +44,4 @@ type RenderState struct {
 	CanvasHeight uint
 
 	PreviousFrameTexID uint32
-}
-
-type Environment interface {
-	// Sources may inspect and modify the supplied shader sources to match the
-	// simulated environment.
-	Sources(sources map[uint32][]string) map[uint32][]string
-
-	// PreRender updates the program's uniform values for the next frame.
-	//
-	// sinceStart is the animation time elapsed since the first frame was
-	// rendered.
-	PreRender(uniforms map[string]Uniform, state RenderState)
 }

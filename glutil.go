@@ -85,32 +85,26 @@ func compileShader(typ uint32, source string) (uint32, error) {
 	return shader, nil
 }
 
-func linkProgram(typedSources map[uint32][]string) (uint32, error) {
-	shaders := map[uint32][]uint32{}
+func linkProgram(typedSources map[uint32]string) (uint32, error) {
+	shaders := map[uint32]uint32{}
 	freeShaders := func() {
 		for _, sh := range shaders {
-			for _, s := range sh {
-				gl.DeleteShader(s)
-			}
+			gl.DeleteShader(sh)
 		}
 	}
 
-	for typ, sources := range typedSources {
-		for _, source := range sources {
-			sh, err := compileShader(typ, source)
-			if err != nil {
-				freeShaders()
-				return 0, err
-			}
-			shaders[typ] = append(shaders[typ], sh)
+	for typ, source := range typedSources {
+		sh, err := compileShader(typ, source)
+		if err != nil {
+			freeShaders()
+			return 0, err
 		}
+		shaders[typ] = sh
 	}
 
 	program := gl.CreateProgram()
 	for _, sh := range shaders {
-		for _, s := range sh {
-			gl.AttachShader(program, s)
-		}
+		gl.AttachShader(program, sh)
 	}
 	gl.LinkProgram(program)
 
@@ -126,9 +120,7 @@ func linkProgram(typedSources map[uint32][]string) (uint32, error) {
 	}
 
 	for _, sh := range shaders {
-		for _, s := range sh {
-			gl.DetachShader(program, s)
-		}
+		gl.DetachShader(program, sh)
 	}
 	freeShaders()
 	if linkErr != nil {

@@ -9,19 +9,24 @@ import (
 )
 
 // GLSLSandbox implements the Environment interface to simulate the canvas of glslsandbox.com.
-type GLSLSandbox struct{}
+type GLSLSandbox struct {
+	// Source is the single fragment shader that should be used for rendering.
+	Source string
+}
 
-func (GLSLSandbox) Sources(sources map[uint32][]string) map[uint32][]string {
-	sources[gl.VERTEX_SHADER] = append(sources[gl.VERTEX_SHADER], `
-		attribute vec3 vert;
-		varying vec2 surfacePosition;
+func (gs GLSLSandbox) Sources() map[glsl.Stage][]string {
+	return map[glsl.Stage][]string{
+		glsl.StageVertex: {`
+			attribute vec3 vert;
+			varying vec2 surfacePosition;
 
-		void main(void) {
-			surfacePosition = vert.xy;
-			gl_Position = vec4(vert, 1.0);
-		}
-	`)
-	return sources
+			void main(void) {
+				surfacePosition = vert.xy;
+				gl_Position = vec4(vert, 1.0);
+			}
+		`},
+		glsl.StageFragment: {gs.Source},
+	}
 }
 
 func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
@@ -44,60 +49,18 @@ func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.Render
 	}
 }
 
-type ShaderToy struct{}
-
-func (ShaderToy) Sources(sources map[uint32][]string) map[uint32][]string {
-	sources[gl.VERTEX_SHADER] = append(sources[gl.VERTEX_SHADER], `
-		attribute vec3 vert;
-		void main(void) {
-			gl_Position = vec4(vert, 1.0);
-		}
-	`)
-
-	glueHead := `
-		uniform vec3 iResolution;
-		uniform float iTime;
-		uniform float iTimeDelta;
-		uniform float iFrame;
-		uniform float iChannelTime[4];
-		uniform vec4 iMouse;
-		uniform vec4 iDate;
-		uniform float iSampleRate;
-		uniform vec3 iChannelResolution[4];
-		// TODO: uniform samplerXX iChanneli;
-	`
-	mainShader := sources[gl.FRAGMENT_SHADER][0]
-	glueTail := `
-		void main(void) {
-			mainImage(gl_FragColor, gl_FragCoord.xy);
-		}
-	`
-
-	sources[gl.FRAGMENT_SHADER] = []string{glueHead + mainShader + glueTail}
-	return sources
-}
-
-func (ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
-	if loc, ok := uniforms["iResolution"]; ok {
-		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 0.0)
-	}
-	if loc, ok := uniforms["iTime"]; ok {
-		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
-	}
-}
-
 func DetectEnvironment(shaderSource string) (glsl.Environment, bool) {
 	// Quick and dirty: run some regular expressions on the source to infer the
 	// environment.
 	reGLSLSandbox := regexp.MustCompile("uniform\\s+vec2\\s+resolution")
 	if reGLSLSandbox.MatchString(shaderSource) {
-		return GLSLSandbox{}, true
+		return GLSLSandbox{Source: shaderSource}, true
 	}
 	// The mainImage function should always be present in ShaderToy image
 	// shaders.
 	reShaderToy := regexp.MustCompile("void\\s+mainImage\\s*\\(\\s*out\\s+vec4\\s+\\w+\\s*,\\s*(?:in)?\\s+vec2\\s+\\w+\\s*\\)")
 	if reShaderToy.MatchString(shaderSource) {
-		return ShaderToy{}, true
+		return ShaderToy{Source: shaderSource}, true
 	}
 	return nil, false
 }

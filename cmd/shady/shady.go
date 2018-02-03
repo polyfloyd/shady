@@ -16,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/polyfloyd/shady"
 	"github.com/polyfloyd/shady/encode"
 )
@@ -97,9 +96,13 @@ func main() {
 	var env glsl.Environment
 	switch *envName {
 	case "glslsandbox":
-		env = GLSLSandbox{}
+		env = GLSLSandbox{
+			Source: string(shaderSource),
+		}
 	case "shadertoy":
-		env = ShaderToy{}
+		env = ShaderToy{
+			Source: string(shaderSource),
+		}
 	case "":
 		var ok bool
 		env, ok = DetectEnvironment(string(shaderSource))
@@ -112,10 +115,7 @@ func main() {
 	}
 
 	// Compile the shader.
-	sources := map[uint32][]string{
-		gl.FRAGMENT_SHADER: {string(shaderSource)},
-	}
-	sh, err := glsl.NewShader(width, height, sources, env)
+	sh, err := glsl.NewShader(width, height, env)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)

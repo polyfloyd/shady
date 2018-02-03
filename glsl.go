@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,7 +37,7 @@ type Shader struct {
 	program  uint32
 }
 
-func NewShader(width, height uint, sources map[uint32][]string, env Environment) (*Shader, error) {
+func NewShader(width, height uint, env Environment) (*Shader, error) {
 	var err error
 	glfwInitOnce.Do(func() {
 		err = glfw.Init()
@@ -112,7 +113,16 @@ func NewShader(width, height uint, sources map[uint32][]string, env Environment)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
 
 	// Set up the shader.
-	sources = env.Sources(sources)
+	rawSources := env.Sources()
+
+	sources := map[uint32]string{}
+	for stage, source := range rawSources {
+		e, err := stage.glEnum()
+		if err != nil {
+			return nil, err
+		}
+		sources[e] = strings.Join(source, "\n")
+	}
 	sh.program, err = linkProgram(sources)
 	if err != nil {
 		return nil, err
