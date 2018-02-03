@@ -42,7 +42,9 @@ type Environment interface {
 }
 
 type RenderState struct {
-	Time time.Duration
+	Time            time.Duration
+	Interval        time.Duration
+	FramesProcessed uint64
 
 	CanvasWidth  uint
 	CanvasHeight uint

@@ -82,11 +82,28 @@ func (st *ShaderToy) Setup() error {
 }
 
 func (st ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
+	// https://shadertoyunofficial.wordpress.com/2016/07/20/special-shadertoy-features/
 	if loc, ok := uniforms["iResolution"]; ok {
 		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 0.0)
 	}
 	if loc, ok := uniforms["iTime"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
+	}
+	if loc, ok := uniforms["iTimeDelta"]; ok {
+		gl.Uniform1f(loc.Location, float32(state.Interval)/float32(time.Second))
+	}
+	if loc, ok := uniforms["iDate"]; ok {
+		t := time.Now()
+		sinceMidnight := t.Sub(t.Truncate(time.Hour * 24))
+		gl.Uniform4f(loc.Location,
+			float32(t.Year()-1),
+			float32(t.Month()-1),
+			float32(t.Day()),
+			float32(sinceMidnight)/float32(time.Second),
+		)
+	}
+	if loc, ok := uniforms["iFrame"]; ok {
+		gl.Uniform1f(loc.Location, float32(state.FramesProcessed))
 	}
 	for _, resource := range st.resources {
 		resource.PreRender(uniforms)

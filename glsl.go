@@ -171,6 +171,8 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 		prevTarget := int(frame&1) ^ 1
 		sh.env.PreRender(sh.uniforms, RenderState{
 			Time:               t,
+			Interval:           interval,
+			FramesProcessed:    frame,
 			CanvasWidth:        sh.w,
 			CanvasHeight:       sh.h,
 			PreviousFrameTexID: sh.targets[prevTarget].texture,
