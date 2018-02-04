@@ -49,7 +49,7 @@ func GLDebugOutput() <-chan GLDebugMessage {
 			Severity: severity,
 			Message:  message,
 		}
-		var stack [512]byte
+		var stack [8192]byte
 		stackLen := runtime.Stack(stack[:], false)
 		dm.Stack = string(stack[:stackLen])
 
