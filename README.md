@@ -39,8 +39,8 @@ looks like.
 * https://shadertoy.com/
 
 Currently, the `iTime`, `iTimeDelta`, `iFrame`, `iDate`, `iMouse`, and
-`iResolution` uniforms are supported. Other uniforms are defined but not
-initialized.
+`iResolution`, `iChannelResolution` uniforms are supported. Other uniforms are
+defined but not initialized.
 
 It is possible use resources like images, videos and audio from shaders in
 this environment by using the `iChannelX` samplers. On the website, one can

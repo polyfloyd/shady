@@ -16,7 +16,10 @@ import (
 	"github.com/polyfloyd/shady"
 )
 
-var inputMappingRe = regexp.MustCompile("(?m)^\\/\\/\\s+map\\s+(\\w+)=([^:]+):(.+)$")
+var (
+	inputMappingRe = regexp.MustCompile("(?m)^\\/\\/\\s+map\\s+(\\w+)=([^:]+):(.+)$")
+	ichannelNumRe  = regexp.MustCompile("^iChannel(\\d+)$")
+)
 
 var texIndexEnum uint32
 
@@ -187,12 +190,14 @@ type imageTexture struct {
 	uniformName string
 	id          uint32
 	index       uint32
+	rect        image.Rectangle
 }
 
 func newImageTexture(img image.Image, uniformName string) (*imageTexture, error) {
 	tex := &imageTexture{
 		uniformName: uniformName,
 		index:       texIndexEnum,
+		rect:        img.Bounds(),
 	}
 	texIndexEnum++
 	gl.GenTextures(1, &tex.id)
@@ -230,6 +235,11 @@ func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform) {
 		gl.BindTexture(gl.TEXTURE_2D, tex.id)
 		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
 		gl.Uniform1i(loc.Location, int32(tex.index))
+	}
+	if m := ichannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
+		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+			gl.Uniform3f(loc.Location, float32(tex.rect.Dx()), float32(tex.rect.Dy()), 1.0)
+		}
 	}
 }
 

@@ -166,10 +166,28 @@ func ListUniforms(program uint32) map[string]Uniform {
 		gl.GetActiveUniform(program, i, bufSize, &length, &size, &typ, gl.Str(nameBuf))
 		name := strings.SplitN(nameBuf, "\x00", -1)[0]
 
-		uniforms[name] = Uniform{
-			Name:     name,
-			Type:     typ,
-			Location: int32(i),
+		if strings.HasSuffix(name, "[0]") {
+			// A [0] suffix indicates that the uniform as an array. Load the
+			// locations of all elements.
+			baseName := strings.TrimSuffix(name, "[0]")
+			for i := 0; ; i++ {
+				elemName := fmt.Sprintf("%s[%d]", baseName, i)
+				loc := gl.GetUniformLocation(program, gl.Str(elemName+"\x00"))
+				if loc == -1 {
+					break
+				}
+				uniforms[elemName] = Uniform{
+					Name:     elemName,
+					Type:     typ,
+					Location: loc,
+				}
+			}
+		} else {
+			uniforms[name] = Uniform{
+				Name:     name,
+				Type:     typ,
+				Location: gl.GetUniformLocation(program, gl.Str(nameBuf)),
+			}
 		}
 	}
 	return uniforms
