@@ -13,9 +13,18 @@
   packages = ["v3.1/glfw"]
   revision = "513e4f2bf85c31fba0fc4907abd7895242ccbe50"
 
+[[projects]]
+  branch = "master"
+  name = "github.com/mjibson/go-dsp"
+  packages = [
+    "dsputils",
+    "fft"
+  ]
+  revision = "49dba83727078f13a0e99553e0f8140990115ac9"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "11a8ea0577802603e85b5ec1ca2684cb8b0bc23ee731b28c0861e9336e352947"
+  inputs-digest = "36fcb5b45142b43d8de48268398a922ce4995c768f91f08679115682bbb2a0a1"
   solver-name = "gps-cdcl"
   solver-version = 1

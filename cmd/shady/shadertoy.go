@@ -6,19 +6,29 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/mjibson/go-dsp/fft"
 	"github.com/polyfloyd/shady"
 )
+
+// Wtf, this is not defined by go-gl?
+const glLUMINANCE = 0x1909
+
+const audioTexWidth = 512
 
 var (
 	inputMappingRe = regexp.MustCompile("(?m)^\\/\\/\\s+map\\s+(\\w+)=([^:]+):(.+)$")
 	ichannelNumRe  = regexp.MustCompile("^iChannel(\\d+)$")
+	audioValueRe   = regexp.MustCompile("^([^,]+);(\\d+):(\\d+):(\\d+)$")
 )
 
 var texIndexEnum uint32
@@ -109,12 +119,12 @@ func (st ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.Rende
 		gl.Uniform1f(loc.Location, float32(state.FramesProcessed))
 	}
 	for _, resource := range st.resources {
-		resource.PreRender(uniforms)
+		resource.PreRender(uniforms, state)
 	}
 }
 
 type resource interface {
-	PreRender(uniforms map[string]glsl.Uniform)
+	PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState)
 }
 
 // A mapping is a parsed representation of a "map <name>=<namespace>:<value>"
@@ -150,6 +160,8 @@ func (m mapping) SamplerType() (string, bool) {
 		}
 	}
 	switch m.Namespace {
+	case "audio":
+		return "sampler2D", true
 	case "image":
 		return "sampler2D", true
 	default:
@@ -169,8 +181,39 @@ func (m mapping) Resource() (resource, error) {
 		}
 	}
 	switch m.Namespace {
+	case "audio":
+		match := audioValueRe.FindStringSubmatch(m.Value)
+		if match == nil {
+			return nil, fmt.Errorf("could not parse audio value: %q (format: %s)", m.Value, audioValueRe)
+		}
+		filename := resolvePath(match[1])
+		samplerate, err := strconv.Atoi(match[2])
+		if err != nil {
+			return nil, err
+		}
+		bits, err := strconv.Atoi(match[3])
+		if err != nil {
+			return nil, err
+		}
+		channels, err := strconv.Atoi(match[4])
+		if err != nil {
+			return nil, err
+		}
+
+		fd, err := os.Open(filename)
+		if err != nil {
+			return nil, fmt.Errorf("could not open audio source: %v", err)
+		}
+		source := &rawSource{
+			file:       fd,
+			sampleRate: samplerate,
+			channels:   channels,
+			bits:       bits,
+		}
+		return newAudioTexture(m.Name, source)
+
 	case "image":
-		fd, err := os.Open(m.Value)
+		fd, err := os.Open(resolvePath(m.Value))
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +273,7 @@ func newImageTexture(img image.Image, uniformName string) (*imageTexture, error)
 	return tex, nil
 }
 
-func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform) {
+func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
 	if loc, ok := uniforms[tex.uniformName]; ok {
 		gl.BindTexture(gl.TEXTURE_2D, tex.id)
 		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
@@ -248,4 +291,142 @@ func noise(rect image.Rectangle) image.Image {
 	rng := rand.New(rand.NewSource(1337))
 	rng.Read(img.Pix)
 	return img
+}
+
+// audioTexture is a mapping of an audio stream.
+type audioTexture struct {
+	uniformName string
+	id          uint32
+	index       uint32
+	source      audioSource
+}
+
+func newAudioTexture(uniformName string, source audioSource) (*audioTexture, error) {
+	at := &audioTexture{
+		uniformName: uniformName,
+		index:       texIndexEnum,
+		source:      source,
+	}
+	texIndexEnum++
+	gl.GenTextures(1, &at.id)
+	gl.BindTexture(gl.TEXTURE_2D, at.id)
+
+	var initialData [audioTexWidth * 2]byte
+	gl.TexImage2D(
+		gl.TEXTURE_2D,          // target
+		0,                      // level
+		glLUMINANCE,            // internalFormat
+		audioTexWidth,          // width
+		2,                      // height
+		0,                      // border
+		glLUMINANCE,            // format
+		gl.UNSIGNED_BYTE,       // type
+		gl.Ptr(initialData[:]), // data
+	)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+	return at, nil
+}
+
+func (at *audioTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
+	period := at.source.ReadSamples(state.Interval)
+	if len(period) < audioTexWidth {
+		period = make([]float64, audioTexWidth)
+	} else {
+		period = period[len(period)-audioTexWidth:]
+	}
+
+	if loc, ok := uniforms[at.uniformName]; ok {
+		freqs := fft.FFTReal(period)
+		textureData := make([]uint8, audioTexWidth*2)
+		for x := 0; x < audioTexWidth/2; x++ {
+			// FFT
+			textureData[x*2] = uint8((real(freqs[x])*0.5 + 0.5) * 255.0)
+			textureData[x*2+1] = uint8((imag(freqs[x])*0.5 + 0.5) * 255.0)
+		}
+		for x := 0; x < audioTexWidth; x++ {
+			// Wave
+			textureData[audioTexWidth+x] = uint8((period[x]*0.5 + 0.5) * 255.0)
+		}
+		gl.BindTexture(gl.TEXTURE_2D, at.id)
+		gl.TexSubImage2D(
+			gl.TEXTURE_2D,       // target,
+			0,                   // level,
+			0,                   // xoffset,
+			0,                   // yoffset,
+			audioTexWidth,       // width,
+			2,                   // height,
+			glLUMINANCE,         // format,
+			gl.UNSIGNED_BYTE,    // type,
+			gl.Ptr(textureData), // data
+		)
+		gl.ActiveTexture(gl.TEXTURE0 + at.index)
+		gl.Uniform1i(loc.Location, int32(at.index))
+	}
+	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
+		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+			gl.Uniform3f(loc.Location, float32(audioTexWidth), float32(2), 1.0)
+		}
+	}
+	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
+		if loc, ok := uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
+			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
+		}
+	}
+	if loc, ok := uniforms["iSampleRate"]; ok {
+		gl.Uniform1f(loc.Location, at.source.SampleRate())
+	}
+}
+
+type audioSource interface {
+	SampleRate() float32
+
+	ReadSamples(period time.Duration) []float64
+}
+
+type rawSource struct {
+	file                       io.Reader
+	sampleRate, channels, bits int
+}
+
+func (s rawSource) SampleRate() float32 {
+	return float32(s.sampleRate)
+}
+
+func (s *rawSource) ReadSamples(period time.Duration) []float64 {
+	numBytes := s.bits / 8
+	buf := make([]byte, (time.Duration(s.sampleRate*s.channels*numBytes)*period)/time.Second)
+	n, err := io.ReadAtLeast(s.file, buf, len(buf))
+	if err != nil {
+		return make([]float64, time.Duration(s.sampleRate)*period/time.Second)
+	}
+
+	samples := make([]float64, n/numBytes)
+	for i := range samples {
+		offset := i * s.channels * numBytes
+		bytes := buf[offset : offset+numBytes]
+
+		switch numBytes {
+		case 2:
+			// 16 bit little endian signed
+			sample := int16(bytes[0]) | int16(bytes[1])<<8
+			samples[i] = float64(sample) / float64(0x7fff)
+		default:
+			panic(fmt.Sprintf("UNIMPLEMENTED: bits=%d", s.bits))
+		}
+	}
+	return samples
+}
+
+func resolvePath(path string) string {
+	if len(path) > 0 && path[0] == '~' {
+		home := os.Getenv("HOME")
+		if home == "" {
+			return path
+		}
+		return filepath.Join(home, path[1:])
+	}
+	return path
 }

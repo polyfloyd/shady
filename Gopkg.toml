@@ -5,3 +5,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/go-gl/glfw"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/mjibson/go-dsp"
