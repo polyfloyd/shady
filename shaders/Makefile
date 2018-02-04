@@ -47,12 +47,12 @@ $(SHADY): $(GOFILES)
 	$(E)" [$(COLOR_COMPILE)GO$(COLOR_RESET)] $@"
 	$(Q)cd ./.. && go build ./cmd/shady/
 
-$(RGBDIR)/%.rgb.gz: $(SRCDIR)/%.glsl $(SHADY)
+$(RGBDIR)/%.rgb.gz: $(SRCDIR)/%.glsl
 	$(E)" [$(COLOR_RGB)RGB$(COLOR_RESET)] $@"
 	$(Q)mkdir -p `dirname $@`
 	$(Q)$(SHADY) -v -i $< -g $(RGBGEOM) -framerate $(RGBFPS) -duration $(RGBSECONDS) -ofmt rgb24 | gzip > $@
 
-$(VIDEODIR)/%.mp4: $(SRCDIR)/%.glsl $(SHADY)
+$(VIDEODIR)/%.mp4: $(SRCDIR)/%.glsl
 	$(E)" [$(COLOR_VIDEO)VIDEO$(COLOR_RESET)] $@"
 	$(Q)mkdir -p `dirname $@`
 	$(Q)$(SHADY) -i $< -g $(VIDEOGEOM) -framerate $(VIDEOFPS) -duration $(VIDEOSECONDS) -ofmt rgb24 | \
