@@ -1,6 +1,8 @@
 package encode
 
 import (
+	"bytes"
+	"fmt"
 	"image"
 	"image/color/palette"
 	"image/draw"
@@ -134,4 +136,60 @@ func (f GIFFormat) EncodeAnimation(w io.Writer, stream <-chan image.Image, inter
 		gifImg.Disposal = append(gifImg.Disposal, gif.DisposalBackground)
 	}
 	return gif.EncodeAll(w, gifImg)
+}
+
+type AnsiDisplay struct{}
+
+func (f AnsiDisplay) Extensions() []string {
+	return []string{}
+}
+
+func (f AnsiDisplay) Encode(w io.Writer, img image.Image) error {
+	// Forward to the code stream encoder for easy code reuse.
+	stream := make(chan image.Image, 1)
+	stream <- img
+	close(stream)
+	return f.EncodeAnimation(w, stream, 0)
+}
+
+func (f AnsiDisplay) EncodeAnimation(w io.Writer, stream <-chan image.Image, interval time.Duration) error {
+	// This implementation is taken from Ledcat:
+	// https://github.com/polyfloyd/ledcat
+
+	lastFrame := time.Now()
+	for img := range stream {
+		width, height := img.Bounds().Dx(), img.Bounds().Dy()
+		// A buffer is used so frames can be written in one go, significantly
+		// improving performance.
+		var buf bytes.Buffer
+		// Clear the screen and any previous frame with it.
+		fmt.Fprintf(&buf, "\x1b[3J\x1b[H\x1b[2J")
+		// Two pixels are rendered at once using the Upper Half Block
+		// character. The top half is colored with the foreground color while
+		// the lower half uses the background. This neat trick allows us to
+		// render square pixels with a higher density than combining two
+		// rectangular characters.
+		for y := 0; y < height/2+(height&1); y++ {
+			for x := 0; x < width; x++ {
+				// Set the foreground color.
+				r, g, b, _ := img.At(x, y*2).RGBA()
+				fmt.Fprintf(&buf, "\x1b[38;2;%d;%d;%dm", r/256, g/256, b/256)
+				// Set the background color.
+				if y*2+1 < img.Bounds().Dy() {
+					r, g, b, _ := img.At(x, y*2+1).RGBA()
+					fmt.Fprintf(&buf, "\x1b[48;2;%d;%d;%dm", r/256, g/256, b/256)
+				} else {
+					fmt.Fprintf(&buf, "\x1b[48;2;0m")
+				}
+				fmt.Fprintf(&buf, "\u2580")
+			}
+			// Reset to the default background color and jump to the next line.
+			fmt.Fprintf(&buf, "\x1b[0m\n")
+		}
+		io.Copy(w, &buf)
+
+		time.Sleep(interval - time.Since(lastFrame))
+		lastFrame = time.Now()
+	}
+	return nil
 }

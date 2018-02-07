@@ -8,11 +8,12 @@ import (
 )
 
 var Formats = map[string]Format{
-	"png":    PNGFormat{},
+	"ansi":   AnsiDisplay{},
+	"gif":    GIFFormat{},
 	"jpg":    JPGFormat{},
+	"png":    PNGFormat{},
 	"rgb24":  RGB24Format{},
 	"rgba32": RGBA32Format{},
-	"gif":    GIFFormat{},
 }
 
 func DetectFormat(filename string) (Format, bool) {
