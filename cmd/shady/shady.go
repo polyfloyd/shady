@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -93,6 +94,14 @@ func main() {
 	// OpenGL contexts are bounds to threads.
 	runtime.LockOSThread()
 
+	if *envName == "" {
+		*envName = DetectEnvironment(string(shaderSource))
+		if *envName == "" {
+			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env\n")
+			os.Exit(1)
+		}
+	}
+
 	var env glsl.Environment
 	switch *envName {
 	case "glslsandbox":
@@ -100,18 +109,19 @@ func main() {
 			Source: string(shaderSource),
 		}
 	case "shadertoy":
-		env = &ShaderToy{
-			Source: string(shaderSource),
+		var resolveDir string
+		if *inputFile == "-" {
+			resolveDir = "."
+		} else {
+			resolveDir = filepath.Dir(*inputFile)
 		}
-	case "":
-		var ok bool
-		env, ok = DetectEnvironment(string(shaderSource))
-		if !ok {
-			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env\n")
-			os.Exit(1)
+		env = &ShaderToy{
+			Source:     string(shaderSource),
+			ResolveDir: resolveDir,
 		}
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown environment: %q", *envName)
+		fmt.Fprintf(os.Stderr, "Unknown environment: %q\n", *envName)
+		os.Exit(1)
 	}
 
 	// Compile the shader.

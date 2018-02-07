@@ -12,11 +12,11 @@ func TestDetectEnvironmentShaderToy(t *testing.T) {
 		`void   mainImage  (  out  vec4  o  ,  in   vec2  i  )  {  }`,
 	}
 	for _, s := range sources {
-		env, ok := DetectEnvironment(s)
-		if !ok {
+		env := DetectEnvironment(s)
+		if env == "" {
 			t.Fatalf("unable to detect environment from source: %q", s)
 		}
-		if _, ok := env.(*ShaderToy); !ok {
+		if env != "shadertoy" {
 			t.Fatalf("detect environment is not ShaderToy for source: %q", s)
 		}
 	}
@@ -28,11 +28,11 @@ func TestDetectEnvironmentGLSLSandbox(t *testing.T) {
 		`uniform  vec2  resolution;`,
 	}
 	for _, s := range sources {
-		env, ok := DetectEnvironment(s)
-		if !ok {
+		env := DetectEnvironment(s)
+		if env == "" {
 			t.Fatalf("unable to detect environment from source: %q", s)
 		}
-		if _, ok := env.(GLSLSandbox); !ok {
+		if env != "glslsandbox" {
 			t.Fatalf("detect environment is not ShaderToy for source: %q", s)
 		}
 	}

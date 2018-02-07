@@ -36,7 +36,8 @@ var texIndexEnum uint32
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
 type ShaderToy struct {
-	Source string
+	Source     string
+	ResolveDir string
 
 	resources []resource
 }
@@ -83,7 +84,7 @@ func (st ShaderToy) Sources() map[glsl.Stage][]string {
 func (st *ShaderToy) Setup() error {
 	mappings := extractMappings(st.Source)
 	for _, mapping := range mappings {
-		res, err := mapping.Resource()
+		res, err := mapping.Resource(st.ResolveDir)
 		if err != nil {
 			return err
 		}
@@ -169,7 +170,7 @@ func (m mapping) SamplerType() (string, bool) {
 	}
 }
 
-func (m mapping) Resource() (resource, error) {
+func (m mapping) Resource(pwd string) (resource, error) {
 	if m.Namespace == "builtin" {
 		switch m.Value {
 		case "RGBA Noise Small": // 64x64 4channels uint8
@@ -186,7 +187,7 @@ func (m mapping) Resource() (resource, error) {
 		if match == nil {
 			return nil, fmt.Errorf("could not parse audio value: %q (format: %s)", m.Value, audioValueRe)
 		}
-		filename := resolvePath(match[1])
+		filename := resolvePath(pwd, match[1])
 		samplerate, err := strconv.Atoi(match[2])
 		if err != nil {
 			return nil, err
@@ -213,7 +214,7 @@ func (m mapping) Resource() (resource, error) {
 		return newAudioTexture(m.Name, source)
 
 	case "image":
-		fd, err := os.Open(resolvePath(m.Value))
+		fd, err := os.Open(resolvePath(pwd, m.Value))
 		if err != nil {
 			return nil, err
 		}
@@ -420,13 +421,16 @@ func (s *rawSource) ReadSamples(period time.Duration) []float64 {
 	return samples
 }
 
-func resolvePath(path string) string {
+func resolvePath(pwd, path string) string {
 	if len(path) > 0 && path[0] == '~' {
 		home := os.Getenv("HOME")
 		if home == "" {
 			return path
 		}
 		return filepath.Join(home, path[1:])
+	}
+	if !filepath.IsAbs(path) {
+		return filepath.Join(pwd, path)
 	}
 	return path
 }
