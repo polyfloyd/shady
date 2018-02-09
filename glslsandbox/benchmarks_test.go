@@ -1,14 +1,14 @@
-package main
+package glslsandbox
 
 import (
 	"context"
 	"image"
+	"os"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/polyfloyd/shady"
-	"github.com/polyfloyd/shady/glslsandbox"
 )
 
 const shaderPlain = `
@@ -28,16 +28,19 @@ var sources = map[string]string{
 }
 
 func BenchmarkCompile(b *testing.B) {
+	if os.Getenv("DISPLAY") == "" {
+		b.SkipNow()
+	}
+
 	for name, source := range sources {
-		env := glslsandbox.GLSLSandbox{Source: source}
+		env := GLSLSandbox{Source: source}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
 			for n := 0; n < b.N; n++ {
 				shader, err := glsl.NewShader(512, 512, env)
 				if err != nil {
-					b.Log(err)
-					b.SkipNow()
+					b.Fatal(err)
 				}
 				shader.Close()
 			}
@@ -46,15 +49,18 @@ func BenchmarkCompile(b *testing.B) {
 }
 
 func BenchmarkRenderImage(b *testing.B) {
+	if os.Getenv("DISPLAY") == "" {
+		b.SkipNow()
+	}
+
 	for name, source := range sources {
-		env := glslsandbox.GLSLSandbox{Source: source}
+		env := GLSLSandbox{Source: source}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
 			shader, err := glsl.NewShader(512, 512, env)
 			if err != nil {
-				b.Log(err)
-				b.SkipNow()
+				b.Fatal(err)
 			}
 			defer shader.Close()
 
@@ -67,15 +73,18 @@ func BenchmarkRenderImage(b *testing.B) {
 }
 
 func BenchmarkRenderAnimation(b *testing.B) {
+	if os.Getenv("DISPLAY") == "" {
+		b.SkipNow()
+	}
+
 	for name, source := range sources {
-		env := glslsandbox.GLSLSandbox{Source: source}
+		env := GLSLSandbox{Source: source}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
 			shader, err := glsl.NewShader(512, 512, env)
 			if err != nil {
-				b.Log(err)
-				b.SkipNow()
+				b.Fatal(err)
 			}
 			defer shader.Close()
 
