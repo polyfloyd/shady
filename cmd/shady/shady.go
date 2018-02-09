@@ -19,6 +19,8 @@ import (
 
 	"github.com/polyfloyd/shady"
 	"github.com/polyfloyd/shady/encode"
+	"github.com/polyfloyd/shady/glslsandbox"
+	"github.com/polyfloyd/shady/shadertoy"
 )
 
 func main() {
@@ -95,7 +97,7 @@ func main() {
 	runtime.LockOSThread()
 
 	if *envName == "" {
-		*envName = DetectEnvironment(string(shaderSource))
+		*envName = glsl.DetectEnvironment(string(shaderSource))
 		if *envName == "" {
 			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env\n")
 			os.Exit(1)
@@ -105,7 +107,7 @@ func main() {
 	var env glsl.Environment
 	switch *envName {
 	case "glslsandbox":
-		env = GLSLSandbox{
+		env = glslsandbox.GLSLSandbox{
 			Source: string(shaderSource),
 		}
 	case "shadertoy":
@@ -115,7 +117,7 @@ func main() {
 		} else {
 			resolveDir = filepath.Dir(*inputFile)
 		}
-		env = &ShaderToy{
+		env = &shadertoy.ShaderToy{
 			Source:     string(shaderSource),
 			ResolveDir: resolveDir,
 		}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/glslsandbox"
 )
 
 const shaderPlain = `
@@ -28,7 +29,7 @@ var sources = map[string]string{
 
 func BenchmarkCompile(b *testing.B) {
 	for name, source := range sources {
-		env := GLSLSandbox{Source: source}
+		env := glslsandbox.GLSLSandbox{Source: source}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
@@ -46,7 +47,7 @@ func BenchmarkCompile(b *testing.B) {
 
 func BenchmarkRenderImage(b *testing.B) {
 	for name, source := range sources {
-		env := GLSLSandbox{Source: source}
+		env := glslsandbox.GLSLSandbox{Source: source}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
@@ -67,7 +68,7 @@ func BenchmarkRenderImage(b *testing.B) {
 
 func BenchmarkRenderAnimation(b *testing.B) {
 	for name, source := range sources {
-		env := GLSLSandbox{Source: source}
+		env := glslsandbox.GLSLSandbox{Source: source}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 

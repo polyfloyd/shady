@@ -1,4 +1,4 @@
-package main
+package glslsandbox
 
 import (
 	"regexp"
@@ -7,6 +7,18 @@ import (
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/polyfloyd/shady"
 )
+
+func init() {
+	glsl.RegisterEnvironmentDetector(func(shaderSource string) string {
+		// Quick and dirty: run some regular expressions on the source to infer
+		// the environment.
+		reGLSLSandbox := regexp.MustCompile("uniform\\s+vec2\\s+resolution")
+		if reGLSLSandbox.MatchString(shaderSource) {
+			return "glslsandbox"
+		}
+		return ""
+	})
+}
 
 // GLSLSandbox implements the Environment interface to simulate the canvas of glslsandbox.com.
 type GLSLSandbox struct {

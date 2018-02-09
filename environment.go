@@ -7,6 +7,12 @@ import (
 	"github.com/go-gl/gl/v3.3-core/gl"
 )
 
+var detectors []func(string) string
+
+func RegisterEnvironmentDetector(det func(string) string) {
+	detectors = append(detectors, det)
+}
+
 type Stage string
 
 const (
@@ -50,4 +56,13 @@ type RenderState struct {
 	CanvasHeight uint
 
 	PreviousFrameTexID uint32
+}
+
+func DetectEnvironment(shaderSource string) string {
+	for _, det := range detectors {
+		if name := det(shaderSource); name != "" {
+			return name
+		}
+	}
+	return ""
 }
