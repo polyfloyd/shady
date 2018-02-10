@@ -62,19 +62,3 @@ func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.Render
 		gl.Uniform1i(loc.Location, 0)
 	}
 }
-
-func DetectEnvironment(shaderSource string) string {
-	// Quick and dirty: run some regular expressions on the source to infer the
-	// environment.
-	reGLSLSandbox := regexp.MustCompile("uniform\\s+vec2\\s+resolution")
-	if reGLSLSandbox.MatchString(shaderSource) {
-		return "glslsandbox"
-	}
-	// The mainImage function should always be present in ShaderToy image
-	// shaders.
-	reShaderToy := regexp.MustCompile("void\\s+mainImage\\s*\\(\\s*out\\s+vec4\\s+\\w+\\s*,\\s*(?:in)?\\s+vec2\\s+\\w+\\s*\\)")
-	if reShaderToy.MatchString(shaderSource) {
-		return "shadertoy"
-	}
-	return ""
-}
