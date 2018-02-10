@@ -134,7 +134,9 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 		getPrevTexID := func() uint32 { return 0 }
 		if prevImageHandle != nil {
 			getPrevTexID = func() uint32 {
-				prevTexID = sh.renderer.Texture(prevImageHandle)
+				if prevTexID == 0 {
+					prevTexID = sh.renderer.Texture(prevImageHandle)
+				}
 				return prevTexID
 			}
 		}
