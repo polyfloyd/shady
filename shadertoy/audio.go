@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"time"
@@ -15,7 +16,10 @@ import (
 
 const audioTexWidth = 512
 
-var audioValueRe = regexp.MustCompile("^([^,]+);(\\d+):(\\d+):([su]\\d{1,2}[lb]e)$")
+var (
+	audioGenericValueRe = regexp.MustCompile("^([^;]+)$")
+	audioPCMValueRe     = regexp.MustCompile("^([^;]+);(\\d+):(\\d+):([su]\\d{1,2}[lb]e)$")
+)
 
 type format string
 
@@ -32,9 +36,22 @@ func (f format) Bits() int {
 }
 
 func parseMappingValue(pwd, value string) (audioSource, error) {
-	match := audioValueRe.FindStringSubmatch(value)
+	if match := audioGenericValueRe.FindStringSubmatch(value); match != nil {
+		channels, samplerate, ft, pcmStream, err := decodeAudioFile(match[1])
+		if err != nil {
+			return nil, err
+		}
+		return &rawSource{
+			file:       pcmStream,
+			sampleRate: samplerate,
+			channels:   channels,
+			format:     ft,
+		}, nil
+	}
+
+	match := audioPCMValueRe.FindStringSubmatch(value)
 	if match == nil {
-		return nil, fmt.Errorf("could not parse audio value: %q (format: %s)", value, audioValueRe)
+		return nil, fmt.Errorf("could not parse audio value: %q (format: %s)", value, audioPCMValueRe)
 	}
 	filename := resolvePath(pwd, match[1])
 	samplerate, err := strconv.Atoi(match[2])
@@ -186,4 +203,24 @@ func (s *rawSource) ReadSamples(period time.Duration) []float64 {
 		panic(fmt.Sprintf("Unimplemented format %q", s.format))
 	}
 	return samples
+}
+
+func decodeAudioFile(filename string) (channels, samplerate int, ft format, stream io.Reader, err error) {
+	r, w := io.Pipe()
+	go func() {
+		cmd := exec.Command(
+			"ffmpeg",
+			"-i", filename,
+			"-f", "s16le",
+			"-acodec", "pcm_s16le",
+			"-ac", "1",
+			"-ar", "22000",
+			"-",
+		)
+		cmd.Stdout = w
+		if err := cmd.Run(); err != nil {
+			w.CloseWithError(err)
+		}
+	}()
+	return 1, 22000, "s16le", r, nil
 }
