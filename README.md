@@ -71,9 +71,16 @@ Example: Enable the sampler named `iChannel0` as a texture with the builtin
 ```
 
 Example: Map `iChannel1` to an image referenced by a path relative to the
-shader source file. Image files become sampler2D type uniforms.
+shader source file. Image files become `sampler2D` type uniforms.
 ```glsl
 // map iChannel1=image:image.png
+```
+
+Example: Map `iChannel2` to the audio output of MPD. Audio sources become
+`sampler2D` type uniforms two pixels high. The top row is the spectrum, the
+bottom is the signal.
+```glsl
+// map iChannel2=audio:~/.mpd/mpd.fifo;22000:1:s16le
 ```
 
 See also https://www.shadertoy.com/howto for info on how to write shaders for
