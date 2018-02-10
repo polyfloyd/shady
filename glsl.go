@@ -51,6 +51,8 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 	}
 	sh := &Shader{
 		win:      win,
+		w:        width,
+		h:        height,
 		env:      env,
 		renderer: &pboRenderer{w: width, h: height},
 	}
