@@ -45,7 +45,7 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 	glfw.WindowHint(glfw.BlueBits, 8)
 	glfw.WindowHint(glfw.AlphaBits, 8)
 	glfw.WindowHint(glfw.DoubleBuffer, glfw.False)
-	win, err := glfw.CreateWindow(1<<12, 1<<12, "glsl", nil, nil)
+	win, err := glfw.CreateWindow(int(width), int(height), "glsl", nil, nil)
 	if err != nil {
 		return nil, err
 	}
