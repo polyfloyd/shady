@@ -36,13 +36,13 @@ func main() {
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
 	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
-	duration := flag.Uint("duration", 0, "Limit the animation to the specified number of seconds. No limit is set by default")
+	duration := flag.Float64("duration", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
 	verbose := flag.Bool("v", false, "Show verbose output about rendering")
 	var shadertoyMappings arrayFlags
 	flag.Var(&shadertoyMappings, "map", "Specify or override ShaderToy input mappings")
 	flag.Parse()
 
-	if *duration != 0 && *numFrames != 0 {
+	if *duration != 0.0 && *numFrames != 0 {
 		fmt.Fprintf(os.Stderr, "-duration and -numframes are mutually exclusive\n")
 		os.Exit(1)
 	}
@@ -54,12 +54,12 @@ func main() {
 		}
 		animateNumFrames = *numFrames
 	}
-	if *duration != 0 {
+	if *duration != 0.0 {
 		if *framerate == 0 {
 			fmt.Fprintf(os.Stderr, "-duration is set while -framerate is not set\n")
 			os.Exit(1)
 		}
-		animateNumFrames = uint(float64(*duration) * *framerate)
+		animateNumFrames = uint(*duration * *framerate)
 	}
 
 	// Figure out the dimensions of the display.
