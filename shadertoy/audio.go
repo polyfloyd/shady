@@ -220,7 +220,9 @@ func decodeAudioFile(filename string) (channels, samplerate int, ft format, stre
 		cmd.Stdout = w
 		if err := cmd.Run(); err != nil {
 			w.CloseWithError(err)
+			return
 		}
+		w.Close()
 	}()
 	return 1, 22000, "s16le", r, nil
 }
