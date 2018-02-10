@@ -57,7 +57,7 @@ func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.Render
 		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))
 	}
 	if loc, ok := uniforms["backbuffer"]; ok {
-		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID)
+		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID())
 		gl.ActiveTexture(gl.TEXTURE0)
 		gl.Uniform1i(loc.Location, 0)
 	}

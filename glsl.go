@@ -52,7 +52,7 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 	sh := &Shader{
 		win:      win,
 		env:      env,
-		renderer: &textureRenderer{w: width, h: height},
+		renderer: &pboRenderer{w: width, h: height},
 	}
 	sh.win.MakeContextCurrent()
 
@@ -129,8 +129,12 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 	buffer := make(chan interface{}, sh.renderer.NumBuffers())
 	for frame := uint64(0); ; frame++ {
 		var prevTexID uint32
+		getPrevTexID := func() uint32 { return 0 }
 		if prevImageHandle != nil {
-			prevTexID = sh.renderer.Texture(prevImageHandle)
+			getPrevTexID = func() uint32 {
+				prevTexID = sh.renderer.Texture(prevImageHandle)
+				return prevTexID
+			}
 		}
 		sh.env.PreRender(sh.uniforms, RenderState{
 			Time:               t,
@@ -138,7 +142,7 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 			FramesProcessed:    frame,
 			CanvasWidth:        sh.w,
 			CanvasHeight:       sh.h,
-			PreviousFrameTexID: prevTexID,
+			PreviousFrameTexID: getPrevTexID,
 		})
 		t += interval
 
@@ -195,75 +199,92 @@ type renderer interface {
 	FreeTexture(id uint32)
 }
 
-type textureRenderer struct {
+type pboRenderer struct {
 	w, h           uint
 	curTargetIndex int
-	targets        [2]struct {
-		texture      uint32
-		renderbuffer uint32
-		framebuffer  uint32
+	targets        [3]struct {
+		pbo, rbo, fbo uint32
 	}
 }
 
-func (tr *textureRenderer) Setup() error {
-	for i := range tr.targets {
-		t := &tr.targets[i]
+func (pr *pboRenderer) Setup() error {
+	for i := range pr.targets {
+		t := &pr.targets[i]
+		// Framebuffer.
+		gl.GenFramebuffers(1, &t.fbo)
+		gl.BindFramebuffer(gl.FRAMEBUFFER, t.fbo)
+		// Color renderbuffer.
+		gl.GenRenderbuffers(1, &t.rbo)
+		gl.BindRenderbuffer(gl.RENDERBUFFER, t.rbo)
+		gl.RenderbufferStorage(gl.RENDERBUFFER, gl.RGBA8, int32(pr.w), int32(pr.h))
 
-		gl.GenTextures(1, &t.texture)
-		gl.BindTexture(gl.TEXTURE_2D, t.texture)
-		gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, int32(tr.w), int32(tr.h), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+		gl.FramebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, t.rbo)
+		gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
+		gl.ReadBuffer(gl.COLOR_ATTACHMENT0)
 
-		gl.GenFramebuffers(1, &t.framebuffer)
-		gl.BindFramebuffer(gl.FRAMEBUFFER, t.framebuffer)
-		gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.texture, 0)
-		gl.GenRenderbuffers(1, &t.renderbuffer)
-		gl.BindRenderbuffer(gl.RENDERBUFFER, t.renderbuffer)
-
-		gl.BindTexture(gl.TEXTURE_2D, 0)
-		gl.BindRenderbuffer(gl.RENDERBUFFER, 0)
-		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+		// Pixelbuffer
+		gl.GenBuffers(1, &t.pbo)
+		gl.BindBuffer(gl.PIXEL_PACK_BUFFER, t.pbo)
+		gl.BufferData(gl.PIXEL_PACK_BUFFER, int(pr.w*pr.h*4), nil, gl.DYNAMIC_READ)
 	}
+	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
+	gl.BindRenderbuffer(gl.RENDERBUFFER, 0)
 	return nil
 }
 
-func (tr *textureRenderer) NumBuffers() int {
-	return len(tr.targets)
+func (pr *pboRenderer) NumBuffers() int {
+	return len(pr.targets)
 }
 
-func (tr *textureRenderer) Image(handle interface{}) image.Image {
+func (pr *pboRenderer) Image(handle interface{}) image.Image {
 	i := handle.(int)
-	img := image.NewRGBA(image.Rect(0, 0, int(tr.w), int(tr.h)))
-	gl.BindTexture(gl.TEXTURE_2D, tr.targets[i].texture)
-	gl.GetTexImage(gl.TEXTURE_2D, 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(&img.Pix[0]))
-	gl.BindTexture(gl.TEXTURE_2D, 0)
+	img := image.NewRGBA(image.Rect(0, 0, int(pr.w), int(pr.h)))
+	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, pr.targets[i].pbo)
+	gl.GetBufferSubData(gl.PIXEL_PACK_BUFFER, 0, int(pr.w*pr.h*4), gl.Ptr(&img.Pix[0]))
+	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, 0)
 	return img
 }
 
-func (tr *textureRenderer) Draw() interface{} {
-	tr.curTargetIndex = (tr.curTargetIndex + 1) % len(tr.targets)
-	i := tr.curTargetIndex
-	gl.BindFramebuffer(gl.FRAMEBUFFER, tr.targets[i].framebuffer)
+func (pr *pboRenderer) Draw() interface{} {
+	pr.curTargetIndex = (pr.curTargetIndex + 1) % len(pr.targets)
+	t := &pr.targets[pr.curTargetIndex]
+	gl.BindFramebuffer(gl.FRAMEBUFFER, t.fbo)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	// Start the transfer of the image to the PBO.
+	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, t.pbo)
+	gl.ReadPixels(0, 0, int32(pr.w), int32(pr.h), gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
-	return i
+	return pr.curTargetIndex
 }
 
-func (tr *textureRenderer) Texture(handle interface{}) uint32 {
-	return tr.targets[handle.(int)].texture
+func (pr *pboRenderer) Texture(handle interface{}) (tex uint32) {
+	t := pr.targets[handle.(int)]
+	gl.GenTextures(1, &tex)
+	gl.BindTexture(gl.TEXTURE_2D, tex)
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, int32(pr.w), int32(pr.h), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+
+	gl.BindBuffer(gl.PIXEL_UNPACK_BUFFER, t.pbo)
+	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, int32(pr.w), int32(pr.h), gl.RGBA, gl.UNSIGNED_BYTE, nil)
+	gl.BindBuffer(gl.PIXEL_UNPACK_BUFFER, 0)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+	return
 }
 
-func (tr *textureRenderer) FreeTexture(id uint32) {}
+func (pr *pboRenderer) FreeTexture(id uint32) {
+	gl.DeleteTextures(1, &id)
+}
 
-func (tr *textureRenderer) Close() error {
-	for _, t := range tr.targets {
-		gl.DeleteBuffers(1, &t.framebuffer)
-		gl.DeleteBuffers(1, &t.renderbuffer)
-		gl.DeleteTextures(1, &t.texture)
+func (pr *pboRenderer) Close() error {
+	for _, t := range pr.targets {
+		gl.DeleteFramebuffers(1, &t.fbo)
+		gl.DeleteRenderbuffers(1, &t.rbo)
+		gl.DeleteBuffers(1, &t.pbo)
 	}
 	return nil
 }

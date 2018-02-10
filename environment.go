@@ -55,7 +55,7 @@ type RenderState struct {
 	CanvasWidth  uint
 	CanvasHeight uint
 
-	PreviousFrameTexID uint32
+	PreviousFrameTexID func() uint32
 }
 
 func DetectEnvironment(shaderSource string) string {
