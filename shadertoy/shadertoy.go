@@ -33,8 +33,9 @@ func init() {
 const glLUMINANCE = 0x1909
 
 var (
-	inputMappingRe = regexp.MustCompile("(?m)^\\/\\/\\s+map\\s+(\\w+)=([^:]+):(.+)$")
-	ichannelNumRe  = regexp.MustCompile("^iChannel(\\d+)$")
+	inputMappingSourceRe = regexp.MustCompile("(?m)^\\/\\/\\s+map\\s+(\\w+)=([^:]+):(.+)$")
+	inputMappingRe       = regexp.MustCompile("^(\\w+)=([^:]+):(.+)$")
+	ichannelNumRe        = regexp.MustCompile("^iChannel(\\d+)$")
 )
 
 var texIndexEnum uint32
@@ -44,15 +45,18 @@ var texIndexEnum uint32
 type ShaderToy struct {
 	Source     string
 	ResolveDir string
+	Mappings   []Mapping
 
 	resources []resource
 }
 
 func (st ShaderToy) Sources() map[glsl.Stage][]string {
-	mappings := extractMappings(st.Source)
+	extracted := extractMappings(st.Source)
+	mappings := deduplicateMappings(st.Mappings, extracted)
+
 	mappedUniforms := make([]string, 0, len(mappings))
 	for _, mapping := range mappings {
-		if typ, ok := mapping.SamplerType(); ok {
+		if typ, ok := mapping.samplerType(); ok {
 			mappedUniforms = append(mappedUniforms, fmt.Sprintf("uniform %s %s;", typ, mapping.Name))
 		}
 	}
@@ -88,9 +92,10 @@ func (st ShaderToy) Sources() map[glsl.Stage][]string {
 }
 
 func (st *ShaderToy) Setup() error {
-	mappings := extractMappings(st.Source)
+	extracted := extractMappings(st.Source)
+	mappings := deduplicateMappings(st.Mappings, extracted)
 	for _, mapping := range mappings {
-		res, err := mapping.Resource(st.ResolveDir)
+		res, err := mapping.resource(st.ResolveDir)
 		if err != nil {
 			return err
 		}
@@ -134,19 +139,31 @@ type resource interface {
 	PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState)
 }
 
-// A mapping is a parsed representation of a "map <name>=<namespace>:<value>"
+// A Mapping is a parsed representation of a "map <name>=<namespace>:<value>"
 // directive.
-type mapping struct {
+type Mapping struct {
 	Name      string
 	Namespace string
 	Value     string
 }
 
-func extractMappings(shaderSource string) []mapping {
-	matches := inputMappingRe.FindAllStringSubmatch(shaderSource, -1)
-	mappings := make([]mapping, 0, len(matches))
+func ParseMapping(str string) (Mapping, error) {
+	match := inputMappingRe.FindStringSubmatch(str)
+	if match != nil {
+		return Mapping{
+			Name:      match[1],
+			Namespace: match[2],
+			Value:     match[3],
+		}, nil
+	}
+	return Mapping{}, fmt.Errorf("unable to parse mapping from %q", str)
+}
+
+func extractMappings(shaderSource string) []Mapping {
+	matches := inputMappingSourceRe.FindAllStringSubmatch(shaderSource, -1)
+	mappings := make([]Mapping, 0, len(matches))
 	for _, match := range matches {
-		mappings = append(mappings, mapping{
+		mappings = append(mappings, Mapping{
 			Name:      match[1],
 			Namespace: match[2],
 			Value:     match[3],
@@ -155,7 +172,26 @@ func extractMappings(shaderSource string) []mapping {
 	return mappings
 }
 
-func (m mapping) SamplerType() (string, bool) {
+// deduplicateMappings filters out mappings which appear multiple times in the
+// specified lists by their name.
+//
+// Lists specified first have precedence.
+func deduplicateMappings(inMappings ...[]Mapping) []Mapping {
+	var outMappings []Mapping
+	set := map[string]bool{}
+	for _, list := range inMappings {
+		for _, m := range list {
+			// Deduplicate by using map keys.
+			if !set[m.Name] {
+				set[m.Name] = true
+				outMappings = append(outMappings, m)
+			}
+		}
+	}
+	return outMappings
+}
+
+func (m Mapping) samplerType() (string, bool) {
 	if m.Namespace == "builtin" {
 		switch m.Value {
 		case "RGBA Noise Small":
@@ -176,7 +212,7 @@ func (m mapping) SamplerType() (string, bool) {
 	}
 }
 
-func (m mapping) Resource(pwd string) (resource, error) {
+func (m Mapping) resource(pwd string) (resource, error) {
 	if m.Namespace == "builtin" {
 		switch m.Value {
 		case "RGBA Noise Small": // 64x64 4channels uint8

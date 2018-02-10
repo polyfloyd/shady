@@ -38,6 +38,8 @@ func main() {
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
 	duration := flag.Uint("duration", 0, "Limit the animation to the specified number of seconds. No limit is set by default")
 	verbose := flag.Bool("v", false, "Show verbose output about rendering")
+	var shadertoyMappings arrayFlags
+	flag.Var(&shadertoyMappings, "map", "Specify or override ShaderToy input mappings")
 	flag.Parse()
 
 	if *duration != 0 && *numFrames != 0 {
@@ -117,9 +119,19 @@ func main() {
 		} else {
 			resolveDir = filepath.Dir(*inputFile)
 		}
+		mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
+		for _, str := range shadertoyMappings {
+			m, err := shadertoy.ParseMapping(str)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+			mappings = append(mappings, m)
+		}
 		env = &shadertoy.ShaderToy{
 			Source:     string(shaderSource),
 			ResolveDir: resolveDir,
+			Mappings:   mappings,
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown environment: %q\n", *envName)
@@ -257,3 +269,16 @@ type nopCloseWriter struct {
 func (nopCloseWriter) Close() error {
 	return nil
 }
+
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+	return "more of the same"
+}
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+var myFlags arrayFlags
