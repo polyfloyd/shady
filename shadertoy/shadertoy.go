@@ -204,6 +204,8 @@ func (m Mapping) samplerType() (string, bool) {
 		return "sampler2D", true
 	case "image":
 		return "sampler2D", true
+	case "video":
+		return "sampler2D", true
 	default:
 		return "", false
 	}
@@ -239,6 +241,10 @@ func (m Mapping) resource(pwd string) (resource, error) {
 			return nil, err
 		}
 		return newImageTexture(img, m.Name)
+
+	case "video":
+		return newVideoTexture(m.Name, resolvePath(pwd, m.Value))
+
 	default:
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
 	}
