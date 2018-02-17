@@ -19,9 +19,10 @@ type videoTexture struct {
 	id          uint32
 	index       uint32
 
-	resolution    image.Rectangle
-	frameInterval time.Duration
-	stream        <-chan interface{}
+	resolution        image.Rectangle
+	frameInterval     time.Duration
+	stream            <-chan interface{}
+	currentVideoFrame int
 }
 
 func newVideoTexture(uniformName, filename string) (*videoTexture, error) {
@@ -62,19 +63,22 @@ func newVideoTexture(uniformName, filename string) (*videoTexture, error) {
 }
 
 func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
-	var frame []byte
-	select {
-	case val := <-vt.stream:
-		switch t := val.(type) {
-		case error:
-			return // TODO: Maybe do something with the error?
-		case []byte:
-			frame = t
-		default:
-			panic(fmt.Sprintf("unreachable (%#v)", val))
-		}
-	default:
+	nextFrameTime := time.Duration(vt.currentVideoFrame+1) * vt.frameInterval
+	if state.Time < nextFrameTime {
 		return
+	}
+	vt.currentVideoFrame++
+
+	var frame []byte
+	switch val := <-vt.stream; t := val.(type) {
+	case error:
+		return // TODO: Maybe do something with the error?
+	case []byte:
+		frame = t
+	case nil:
+		return // EOF
+	default:
+		panic(fmt.Sprintf("unreachable (%#v)", val))
 	}
 
 	if loc, ok := uniforms[vt.uniformName]; ok {
@@ -105,12 +109,6 @@ func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 	}
 }
 
-type videoSource interface {
-	SampleRate() float32
-
-	ReadSamples(period time.Duration) []float64
-}
-
 func decodeVideoFile(filename string) (image.Rectangle, time.Duration, <-chan interface{}, error) {
 	info, err := ffprobe(filename)
 	if err != nil {
@@ -126,10 +124,11 @@ func decodeVideoFile(filename string) (image.Rectangle, time.Duration, <-chan in
 	s := strings.Split(videoInfo.AvgFrameRate, "/")
 	nu, _ := strconv.Atoi(s[0])
 	de, _ := strconv.Atoi(s[1])
-	interval := time.Second / time.Duration(float64(nu)/float64(de))
+	interval := time.Duration(float64(time.Second) / (float64(nu) / float64(de)))
 
-	out := make(chan interface{}, 24)
+	out := make(chan interface{}, 4)
 	go func() {
+		defer close(out)
 		cmd := exec.Command(
 			"ffmpeg",
 			"-i", filename,
@@ -147,9 +146,7 @@ func decodeVideoFile(filename string) (image.Rectangle, time.Duration, <-chan in
 			return
 		}
 
-		timer := time.NewTimer(interval)
 		for {
-			start := time.Now()
 			imgBuf := make([]byte, resolution.Dx()*resolution.Dy()*3)
 			if _, err := io.ReadFull(stdout, imgBuf); err != nil {
 				if err != io.EOF {
@@ -157,12 +154,7 @@ func decodeVideoFile(filename string) (image.Rectangle, time.Duration, <-chan in
 				}
 				break
 			}
-			select {
-			case out <- imgBuf:
-				time.Sleep(interval - time.Since(start))
-			case <-timer.C:
-				timer.Reset(interval)
-			}
+			out <- imgBuf
 		}
 
 		if err := cmd.Wait(); err != nil {
