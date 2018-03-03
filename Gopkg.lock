@@ -22,9 +22,21 @@
   ]
   revision = "49dba83727078f13a0e99553e0f8140990115ac9"
 
+[[projects]]
+  branch = "master"
+  name = "github.com/tarm/serial"
+  packages = ["."]
+  revision = "eaafced92e9619f03c72527efeab21e326f3bc36"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  revision = "dd2ff4accc098aceecb86b36eaa7829b2a17b1c9"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "36fcb5b45142b43d8de48268398a922ce4995c768f91f08679115682bbb2a0a1"
+  inputs-digest = "ba1c0fbb29063164521645be5e923f7f308fc13c799ee9089750c2a6c0aaba7b"
   solver-name = "gps-cdcl"
   solver-version = 1

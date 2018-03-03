@@ -206,6 +206,8 @@ func (m Mapping) samplerType() (string, bool) {
 		return "sampler2D", true
 	case "video":
 		return "sampler2D", true
+	case "perip_mat4":
+		return "mat4", true
 	default:
 		return "", false
 	}
@@ -244,6 +246,9 @@ func (m Mapping) resource(pwd string) (resource, error) {
 
 	case "video":
 		return newVideoTexture(m.Name, resolvePath(pwd, m.Value))
+
+	case "perip_mat4":
+		return newMat4Peripheral(m.Name, pwd, m.Value)
 
 	default:
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
