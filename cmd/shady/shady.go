@@ -37,6 +37,7 @@ func main() {
 	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
 	duration := flag.Float64("duration", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
+	realtime := flag.Bool("rt", false, "Render at the actual number of frames per second set by -framerate")
 	verbose := flag.Bool("v", false, "Show verbose output about rendering")
 	var shadertoyMappings arrayFlags
 	flag.Var(&shadertoyMappings, "map", "Specify or override ShaderToy input mappings")
@@ -60,6 +61,10 @@ func main() {
 			os.Exit(1)
 		}
 		animateNumFrames = uint(*duration * *framerate)
+	}
+	if *realtime && *framerate == 0 {
+		fmt.Fprintf(os.Stderr, "-rt is set while -framerate is not set\n")
+		os.Exit(1)
 	}
 
 	// Figure out the dimensions of the display.
@@ -211,6 +216,9 @@ func main() {
 				fmt.Fprintf(os.Stderr, "\rfps=%.2f frames=%d/%s speed=%.2f", fps, frame, frameTarget, speed)
 			}
 
+			if *realtime {
+				time.Sleep(interval - renderTime)
+			}
 			counterStream <- img
 			if frame == animateNumFrames {
 				cancel()
