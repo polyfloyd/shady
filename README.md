@@ -139,12 +139,14 @@ done
 ```
 Optionally, you could use something like gzip to reduce the file size.
 
-#### PlatformError: X11: Failed to open display
-Make sure X is running and `$DISPLAY` is set. Headless support is
-[TODO](https://github.com/polyfloyd/shady/issues/1).
+#### EGL is not initialized, or could not be initialized
+Headless rendering is possible. If `$DISPLAY` is unset because X11 is not
+running, try running shady with the `EGL_PLATFORM` env var set to `surfaceless`
+or `drm`.
 
-If this is not possible or undesirable, animate to a file and play from that
-file in real time. [See above](#user-content-my-performance-is-really-bad).
+If you still are not able to get shady to run headless, animate to a file and
+play from that file in real time. [See
+above](#user-content-my-performance-is-really-bad).
 
 #### unexpected NEW_IDENTIFIER
 ```

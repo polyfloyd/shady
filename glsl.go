@@ -8,19 +8,16 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
-	"github.com/go-gl/glfw/v3.1/glfw"
+	"github.com/polyfloyd/shady/egl"
 )
-
-var glfwInitOnce sync.Once
 
 type Shader struct {
 	w, h uint
 
-	win     *glfw.Window
+	display egl.Display
 	vertLoc uint32
 	canvas  uint32
 
@@ -31,32 +28,22 @@ type Shader struct {
 }
 
 func NewShader(width, height uint, env Environment) (*Shader, error) {
-	var err error
-	glfwInitOnce.Do(func() {
-		err = glfw.Init()
-	})
+	display, err := egl.GetDisplay(egl.DefaultDisplay)
 	if err != nil {
 		return nil, err
 	}
+	surface := display.CreateSurface(width, height)
+	display.BindAPI(egl.OpenGLAPI)
+	context := display.CreateContext(surface)
+	context.MakeCurrent()
 
-	glfw.WindowHint(glfw.Visible, glfw.False)
-	glfw.WindowHint(glfw.RedBits, 8)
-	glfw.WindowHint(glfw.GreenBits, 8)
-	glfw.WindowHint(glfw.BlueBits, 8)
-	glfw.WindowHint(glfw.AlphaBits, 8)
-	glfw.WindowHint(glfw.DoubleBuffer, glfw.False)
-	win, err := glfw.CreateWindow(int(width), int(height), "glsl", nil, nil)
-	if err != nil {
-		return nil, err
-	}
 	sh := &Shader{
-		win:      win,
+		display:  display,
 		w:        width,
 		h:        height,
 		env:      env,
 		renderer: &pboRenderer{w: width, h: height},
 	}
-	sh.win.MakeContextCurrent()
 
 	// Initialize OpenGL
 	if err := gl.Init(); err != nil {
@@ -174,7 +161,7 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 func (sh *Shader) Close() error {
 	gl.DeleteProgram(sh.program)
 	gl.DeleteBuffers(1, &sh.canvas)
-	defer sh.win.Destroy()
+	defer sh.display.Destroy()
 	if err := sh.renderer.Close(); err != nil {
 		return err
 	}

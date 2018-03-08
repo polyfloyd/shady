@@ -9,12 +9,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/go-gl/glfw"
-  packages = ["v3.1/glfw"]
-  revision = "513e4f2bf85c31fba0fc4907abd7895242ccbe50"
-
-[[projects]]
-  branch = "master"
   name = "github.com/mjibson/go-dsp"
   packages = [
     "dsputils",
@@ -37,6 +31,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ba1c0fbb29063164521645be5e923f7f308fc13c799ee9089750c2a6c0aaba7b"
+  inputs-digest = "117d16eb29db905ed6eee9ff167a9f3c7860ea2768e4f3f4f113801d22978cd1"
   solver-name = "gps-cdcl"
   solver-version = 1
