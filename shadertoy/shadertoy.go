@@ -30,9 +30,9 @@ func init() {
 const glLUMINANCE = 0x1909
 
 var (
-	inputMappingSourceRe = regexp.MustCompile("(?m)^\\/\\/\\s+map\\s+(\\w+)=([^:]+):(.+)$")
-	inputMappingRe       = regexp.MustCompile("^(\\w+)=([^:]+):(.+)$")
-	ichannelNumRe        = regexp.MustCompile("^iChannel(\\d+)$")
+	inputMappingSourceRe = regexp.MustCompile(`(?m)^#pragma\s+map\s+(\w+)=([^:]+):(.+)$`)
+	inputMappingRe       = regexp.MustCompile(`^(\w+)=([^:]+):(.+)$`)
+	ichannelNumRe        = regexp.MustCompile(`^iChannel(\d+)$`)
 )
 
 var texIndexEnum uint32
