@@ -7,6 +7,7 @@ import (
 	"image"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -24,12 +25,14 @@ import (
 )
 
 func main() {
+	log.SetOutput(os.Stderr)
+
 	formatNames := make([]string, 0, len(encode.Formats))
 	for name := range encode.Formats {
 		formatNames = append(formatNames, name)
 	}
 
-	inputFile := flag.String("i", "-", "The shader file to use. Will read from stdin by default")
+	inputFile := flag.String("i", "", "The shader file to use")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
 	envName := flag.String("env", "", "The environment (aka website) to simulate. Valid values are \"glslsandbox\", \"shadertoy\" or \"\" to autodetect")
@@ -44,59 +47,50 @@ func main() {
 	flag.Parse()
 
 	if *duration != 0.0 && *numFrames != 0 {
-		fmt.Fprintf(os.Stderr, "-duration and -numframes are mutually exclusive\n")
-		os.Exit(1)
+		log.Fatalf("-duration and -numframes are mutually exclusive")
 	}
 	var animateNumFrames uint
 	if *numFrames != 0 {
 		if *framerate == 0 {
-			fmt.Fprintf(os.Stderr, "-numframes is set while -framerate is not set\n")
-			os.Exit(1)
+			log.Fatalf("-numframes is set while -framerate is not set")
 		}
 		animateNumFrames = *numFrames
 	}
 	if *duration != 0.0 {
 		if *framerate == 0 {
-			fmt.Fprintf(os.Stderr, "-duration is set while -framerate is not set\n")
-			os.Exit(1)
+			log.Fatalf("-duration is set while -framerate is not set")
 		}
 		animateNumFrames = uint(*duration * *framerate)
 	}
 	if *realtime && *framerate == 0 {
-		fmt.Fprintf(os.Stderr, "-rt is set while -framerate is not set\n")
-		os.Exit(1)
+		log.Fatalf("-rt is set while -framerate is not set")
 	}
 
 	// Figure out the dimensions of the display.
 	width, height, err := parseGeometry(*geometry)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		log.Fatalf("%v", err)
 	}
 
 	var format encode.Format
 	var ok bool
 	if *outputFormat == "" {
 		if format, ok = encode.DetectFormat(*outputFile); !ok {
-			fmt.Fprintf(os.Stderr, "Unable to detect output format. Please set the -ofmt flag\n")
-			os.Exit(1)
+			log.Fatalf("Unable to detect output format. Please set the -ofmt flag")
 		}
 	} else if format, ok = encode.Formats[*outputFormat]; !ok {
-		fmt.Fprintf(os.Stderr, "Unknown output format: %q", *outputFile)
-		os.Exit(1)
+		log.Fatalf("Unknown output format: %q", *outputFile)
 	}
 
 	// Load the shader.
 	shaderSourceFile, err := openReader(*inputFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		log.Fatalf("%v", err)
 	}
 	defer shaderSourceFile.Close()
 	shaderSource, err := ioutil.ReadAll(shaderSourceFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		log.Fatalf("%v\n", err)
 	}
 
 	// Lock this goroutine to the current thread. This is required because
@@ -106,7 +100,7 @@ func main() {
 	if *envName == "" {
 		*envName = glsl.DetectEnvironment(string(shaderSource))
 		if *envName == "" {
-			fmt.Fprintf(os.Stderr, "Unable to detect the environment to use. Please set it using -env\n")
+			log.Fatalf("Unable to detect the environment to use. Please set it using -env")
 			os.Exit(1)
 		}
 	}
@@ -128,8 +122,7 @@ func main() {
 		for _, str := range shadertoyMappings {
 			m, err := shadertoy.ParseMapping(str)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				log.Fatalf("%v", err)
 			}
 			mappings = append(mappings, m)
 		}
@@ -139,23 +132,20 @@ func main() {
 			Mappings:   mappings,
 		}
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown environment: %q\n", *envName)
-		os.Exit(1)
+		log.Fatalf("Unknown environment: %q", *envName)
 	}
 
 	// Compile the shader.
 	sh, err := glsl.NewShader(width, height, env)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		log.Fatalf("%v", err)
 	}
 	defer sh.Close()
 
 	// Open the output.
 	outWriter, err := openWriter(*outputFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		log.Fatalf("%v", err)
 	}
 	defer outWriter.Close()
 
@@ -163,8 +153,7 @@ func main() {
 		img := sh.Image()
 		// We're not dealing with an animation, just export a single image.
 		if err := format.Encode(outWriter, img); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
+			log.Fatalf("%v", err)
 		}
 		return
 	}
@@ -185,7 +174,7 @@ func main() {
 	}()
 	go func() {
 		if err := format.EncodeAnimation(outWriter, counterStream, interval); err != nil {
-			fmt.Fprintf(os.Stderr, "Error animating: %v", err)
+			log.Printf("Error animating: %v", err)
 			cancel()
 			go func() {
 				// Prevent deadlocking the counter routine.
