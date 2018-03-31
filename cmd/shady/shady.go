@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"image"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -82,13 +81,8 @@ func main() {
 		log.Fatalf("Unknown output format: %q", *outputFile)
 	}
 
-	// Load the shader.
-	shaderSourceFile, err := openReader(*inputFile)
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
-	defer shaderSourceFile.Close()
-	shaderSource, err := ioutil.ReadAll(shaderSourceFile)
+	// Load the shader sources.
+	sources, err := glsl.ProcessSourceFile(*inputFile)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
@@ -98,7 +92,9 @@ func main() {
 	runtime.LockOSThread()
 
 	if *envName == "" {
-		*envName = glsl.DetectEnvironment(string(shaderSource))
+		for i := 0; *envName == "" && i < len(sources); i++ {
+			*envName = glsl.DetectEnvironment(sources[i])
+		}
 		if *envName == "" {
 			log.Fatalf("Unable to detect the environment to use. Please set it using -env")
 			os.Exit(1)
@@ -109,7 +105,7 @@ func main() {
 	switch *envName {
 	case "glslsandbox":
 		env = glslsandbox.GLSLSandbox{
-			Source: string(shaderSource),
+			Source: strings.Join(sources, "\n\n"),
 		}
 	case "shadertoy":
 		var resolveDir string
@@ -127,9 +123,9 @@ func main() {
 			mappings = append(mappings, m)
 		}
 		env = &shadertoy.ShaderToy{
-			Source:     string(shaderSource),
-			ResolveDir: resolveDir,
-			Mappings:   mappings,
+			ShaderSources: sources,
+			ResolveDir:    resolveDir,
+			Mappings:      mappings,
 		}
 	default:
 		log.Fatalf("Unknown environment: %q", *envName)
@@ -243,13 +239,6 @@ func parseGeometry(geom string) (uint, uint, error) {
 		return 0, 0, fmt.Errorf("no geometry dimension can be 0, got (%d, %d)", w, h)
 	}
 	return uint(w), uint(h), nil
-}
-
-func openReader(filename string) (io.ReadCloser, error) {
-	if filename == "-" {
-		return ioutil.NopCloser(os.Stdin), nil
-	}
-	return os.Open(filename)
 }
 
 func openWriter(filename string) (io.WriteCloser, error) {

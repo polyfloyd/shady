@@ -40,15 +40,18 @@ var texIndexEnum uint32
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
 type ShaderToy struct {
-	Source     string
-	ResolveDir string
-	Mappings   []Mapping
+	ShaderSources []string
+	ResolveDir    string
+	Mappings      []Mapping
 
 	resources []resource
 }
 
 func (st ShaderToy) Sources() map[glsl.Stage][]string {
-	extracted := extractMappings(st.Source)
+	extracted := []Mapping{}
+	for _, src := range st.ShaderSources {
+		extracted = append(extracted, extractMappings(src)...)
+	}
 	mappings := deduplicateMappings(st.Mappings, extracted)
 
 	mappedUniforms := make([]string, 0, len(mappings))
@@ -66,31 +69,39 @@ func (st ShaderToy) Sources() map[glsl.Stage][]string {
 				gl_Position = vec4(vert, 1.0);
 			}
 		`},
-		glsl.StageFragment: {`
-			#version 130
-			uniform vec3 iResolution;
-			uniform float iTime;
-			uniform float iTimeDelta;
-			uniform float iFrame;
-			uniform float iChannelTime[4];
-			uniform vec4 iMouse;
-			uniform vec4 iDate;
-			uniform float iSampleRate;
-			uniform vec3 iChannelResolution[4];
-		`,
-			strings.Join(mappedUniforms, "\n"),
-			st.Source,
-			`
-			void main(void) {
-				mainImage(gl_FragColor, gl_FragCoord.xy);
-			}
-		`},
+		glsl.StageFragment: func() []string {
+			s := []string{}
+			s = append(s, `
+				#version 130
+				uniform vec3 iResolution;
+				uniform float iTime;
+				uniform float iTimeDelta;
+				uniform float iFrame;
+				uniform float iChannelTime[4];
+				uniform vec4 iMouse;
+				uniform vec4 iDate;
+				uniform float iSampleRate;
+				uniform vec3 iChannelResolution[4];
+			`)
+			s = append(s, strings.Join(mappedUniforms, "\n"))
+			s = append(s, st.ShaderSources...)
+			s = append(s, `
+				void main(void) {
+					mainImage(gl_FragColor, gl_FragCoord.xy);
+				}
+			`)
+			return s
+		}(),
 	}
 }
 
 func (st *ShaderToy) Setup() error {
-	extracted := extractMappings(st.Source)
+	extracted := []Mapping{}
+	for _, src := range st.ShaderSources {
+		extracted = append(extracted, extractMappings(src)...)
+	}
 	mappings := deduplicateMappings(st.Mappings, extracted)
+
 	for _, mapping := range mappings {
 		res, err := mapping.resource(st.ResolveDir)
 		if err != nil {
