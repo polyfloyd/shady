@@ -138,7 +138,9 @@ func (f GIFFormat) EncodeAnimation(w io.Writer, stream <-chan image.Image, inter
 	return gif.EncodeAll(w, gifImg)
 }
 
-type AnsiDisplay struct{}
+type AnsiDisplay struct {
+	initDone bool
+}
 
 func (f AnsiDisplay) Extensions() []string {
 	return []string{}
@@ -152,7 +154,7 @@ func (f AnsiDisplay) Encode(w io.Writer, img image.Image) error {
 	return f.EncodeAnimation(w, stream, 0)
 }
 
-func (f AnsiDisplay) EncodeAnimation(w io.Writer, stream <-chan image.Image, interval time.Duration) error {
+func (f *AnsiDisplay) EncodeAnimation(w io.Writer, stream <-chan image.Image, interval time.Duration) error {
 	// This implementation is taken from Ledcat:
 	// https://github.com/polyfloyd/ledcat
 
@@ -162,8 +164,15 @@ func (f AnsiDisplay) EncodeAnimation(w io.Writer, stream <-chan image.Image, int
 		// A buffer is used so frames can be written in one go, significantly
 		// improving performance.
 		var buf bytes.Buffer
-		// Clear the screen and any previous frame with it.
-		fmt.Fprintf(&buf, "\x1b[3J\x1b[H\x1b[2J")
+		if !f.initDone {
+			// Clear the screen and any previous frame with it.
+			fmt.Fprintf(&buf, "\x1b[3J\x1b[H\x1b[2J")
+			f.initDone = true
+		} else {
+			// Move the cursor to the top-left of the screen.
+			fmt.Fprintf(&buf, "\x1b[1;1H")
+		}
+
 		// Two pixels are rendered at once using the Upper Half Block
 		// character. The top half is colored with the foreground color while
 		// the lower half uses the background. This neat trick allows us to
