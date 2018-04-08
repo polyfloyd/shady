@@ -1,34 +1,57 @@
 package glsl
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 )
 
 var ppIncludeRe = regexp.MustCompile(`(?im)^#pragma\s+use\s+"([^"]+)"$`)
 
-type includedSource struct {
-	filename string
-	source   string
+type Source interface {
+	Contents() ([]byte, error)
 }
 
-func processRecursive(filename string, sources []includedSource) ([]includedSource, error) {
-	// Read the current file.
-	shaderSourceFile, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer shaderSourceFile.Close()
-	shaderSource, err := ioutil.ReadAll(shaderSourceFile)
-	if err != nil {
-		return nil, err
-	}
+type SourceBuf string
 
-	currentFile := includedSource{
-		filename: filename,
-		source:   string(shaderSource),
+func (s SourceBuf) Contents() ([]byte, error) {
+	return []byte(s), nil
+}
+
+type SourceFile struct {
+	Filename string
+}
+
+// Includes recursively resolves dependencies in the specified file.
+//
+// The argument file is returned included in the returned list of files.
+func Includes(filename string) ([]SourceFile, error) {
+	absFilename, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
+	}
+	return processRecursive(absFilename, []SourceFile{})
+}
+
+func (s SourceFile) Contents() ([]byte, error) {
+	fd, err := os.Open(s.Filename)
+	if err != nil {
+		return nil, err
+	}
+	defer fd.Close()
+	return ioutil.ReadAll(fd)
+}
+
+func processRecursive(filename string, sources []SourceFile) ([]SourceFile, error) {
+	currentFile := SourceFile{
+		Filename: filename,
+	}
+	shaderSource, err := currentFile.Contents()
+	if err != nil {
+		return nil, err
 	}
 
 	// We need to check for recursion using a set that includes the current
@@ -52,7 +75,7 @@ outer:
 		// Check whether we have already included the referred file. This stops
 		// infinite recursions.
 		for _, inc := range checkset {
-			if inc.filename == includedFile {
+			if inc.Filename == includedFile {
 				continue outer
 			}
 		}
@@ -64,21 +87,4 @@ outer:
 	}
 
 	return append(sources, currentFile), nil
-}
-
-func ProcessSourceFile(filename string) ([]string, error) {
-	absFilename, err := filepath.Abs(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	sourceMap, err := processRecursive(absFilename, []includedSource{})
-	if err != nil {
-		return nil, err
-	}
-	sources := make([]string, 0, len(sourceMap))
-	for _, inc := range sourceMap {
-		sources = append(sources, inc.source)
-	}
-	return sources, nil
 }

@@ -34,7 +34,7 @@ func (stage Stage) glEnum() (uint32, error) {
 type Environment interface {
 	// Sources should return the shader sources mapped by their pipeline stage.
 	// Multiple shader sources are combined per stage.
-	Sources() map[Stage][]string
+	Sources() (map[Stage][]Source, error)
 
 	// Setup may be used to initialize any OpenGL state before the first frame
 	// is rendered.

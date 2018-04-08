@@ -82,7 +82,7 @@ func main() {
 	}
 
 	// Load the shader sources.
-	sources, err := glsl.ProcessSourceFile(*inputFile)
+	sources, err := glsl.Includes(*inputFile)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
@@ -93,20 +93,25 @@ func main() {
 
 	if *envName == "" {
 		for i := 0; *envName == "" && i < len(sources); i++ {
-			*envName = glsl.DetectEnvironment(sources[i])
+			src, err := sources[i].Contents()
+			if err != nil {
+				log.Fatal(err)
+			}
+			*envName = glsl.DetectEnvironment(string(src))
 		}
 		if *envName == "" {
 			log.Fatalf("Unable to detect the environment to use. Please set it using -env")
-			os.Exit(1)
 		}
 	}
 
 	var env glsl.Environment
 	switch *envName {
 	case "glslsandbox":
-		env = glslsandbox.GLSLSandbox{
-			Source: strings.Join(sources, "\n\n"),
+		ss := make([]glsl.Source, 0, len(sources))
+		for _, s := range sources {
+			ss = append(ss, s)
 		}
+		env = glslsandbox.GLSLSandbox{ShaderSources: ss}
 	case "shadertoy":
 		var resolveDir string
 		if *inputFile == "-" {

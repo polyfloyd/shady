@@ -33,12 +33,12 @@ func TestOutputSize(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := `
+	source := glsl.SourceBuf(`
 		void main(void) {
 			gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 		}
-	`
-	env := GLSLSandbox{Source: source}
+	`)
+	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
 	shader, err := glsl.NewShader(w, h, env)
@@ -62,7 +62,7 @@ func TestColorOrdering(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := `
+	source := glsl.SourceBuf(`
 		void main(void) {
 			if (gl_FragCoord.y <= 1.0) {
 				gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
@@ -74,8 +74,8 @@ func TestColorOrdering(t *testing.T) {
 				gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 			}
 		}
-	`
-	env := GLSLSandbox{Source: source}
+	`)
+	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
 	shader, err := glsl.NewShader(w, h, env)
@@ -112,7 +112,7 @@ func TestAnimationTime(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := `
+	source := glsl.SourceBuf(`
 		uniform float time;
 		void main(void) {
 			if (time <= 0.5) {
@@ -125,8 +125,8 @@ func TestAnimationTime(t *testing.T) {
 				gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 			}
 		}
-	`
-	env := GLSLSandbox{Source: source}
+	`)
+	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
 	shader, err := glsl.NewShader(w, h, env)
@@ -168,7 +168,7 @@ func TestAnimationBackbuffer(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := `
+	source := glsl.SourceBuf(`
 		uniform sampler2D backbuffer;
 		void main(void) {
 			vec4 c = texture2D(backbuffer, gl_FragCoord.xy);
@@ -182,8 +182,8 @@ func TestAnimationBackbuffer(t *testing.T) {
 				gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 			}
 		}
-	`
-	env := GLSLSandbox{Source: source}
+	`)
+	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
 	shader, err := glsl.NewShader(w, h, env)

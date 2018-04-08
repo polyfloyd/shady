@@ -40,19 +40,22 @@ var texIndexEnum uint32
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
 type ShaderToy struct {
-	ShaderSources []string
+	ShaderSources []glsl.SourceFile
 	ResolveDir    string
 	Mappings      []Mapping
 
 	resources []resource
 }
 
-func (st ShaderToy) Sources() map[glsl.Stage][]string {
-	extracted := []Mapping{}
-	for _, src := range st.ShaderSources {
-		extracted = append(extracted, extractMappings(src)...)
+func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
+	ss := make([]glsl.Source, 0, len(st.ShaderSources))
+	for _, s := range st.ShaderSources {
+		ss = append(ss, s)
 	}
-	mappings := deduplicateMappings(st.Mappings, extracted)
+	mappings, err := extractMappings(ss)
+	if err != nil {
+		return nil, err
+	}
 
 	mappedUniforms := make([]string, 0, len(mappings))
 	for _, mapping := range mappings {
@@ -61,17 +64,17 @@ func (st ShaderToy) Sources() map[glsl.Stage][]string {
 		}
 	}
 
-	return map[glsl.Stage][]string{
-		glsl.StageVertex: {`
+	return map[glsl.Stage][]glsl.Source{
+		glsl.StageVertex: {glsl.SourceBuf(`
 			#version 130
 			attribute vec3 vert;
 			void main(void) {
 				gl_Position = vec4(vert, 1.0);
 			}
-		`},
-		glsl.StageFragment: func() []string {
-			s := []string{}
-			s = append(s, `
+		`)},
+		glsl.StageFragment: func() []glsl.Source {
+			ss := []glsl.Source{}
+			ss = append(ss, glsl.SourceBuf(`
 				#version 130
 				uniform vec3 iResolution;
 				uniform float iTime;
@@ -82,25 +85,30 @@ func (st ShaderToy) Sources() map[glsl.Stage][]string {
 				uniform vec4 iDate;
 				uniform float iSampleRate;
 				uniform vec3 iChannelResolution[4];
-			`)
-			s = append(s, strings.Join(mappedUniforms, "\n"))
-			s = append(s, st.ShaderSources...)
-			s = append(s, `
+			`))
+			ss = append(ss, glsl.SourceBuf(strings.Join(mappedUniforms, "\n")))
+			for _, s := range st.ShaderSources {
+				ss = append(ss, s)
+			}
+			ss = append(ss, glsl.SourceBuf(`
 				void main(void) {
 					mainImage(gl_FragColor, gl_FragCoord.xy);
 				}
-			`)
-			return s
+			`))
+			return ss
 		}(),
-	}
+	}, nil
 }
 
 func (st *ShaderToy) Setup() error {
-	extracted := []Mapping{}
-	for _, src := range st.ShaderSources {
-		extracted = append(extracted, extractMappings(src)...)
+	ss := make([]glsl.Source, 0, len(st.ShaderSources))
+	for _, s := range st.ShaderSources {
+		ss = append(ss, s)
 	}
-	mappings := deduplicateMappings(st.Mappings, extracted)
+	mappings, err := extractMappings(ss)
+	if err != nil {
+		return err
+	}
 
 	for _, mapping := range mappings {
 		res, err := mapping.resource(st.ResolveDir)
@@ -167,33 +175,37 @@ func ParseMapping(str string) (Mapping, error) {
 	return Mapping{}, fmt.Errorf("unable to parse mapping from %q", str)
 }
 
-func extractMappings(shaderSource string) []Mapping {
-	matches := inputMappingSourceRe.FindAllStringSubmatch(shaderSource, -1)
-	mappings := make([]Mapping, 0, len(matches))
-	for _, match := range matches {
-		mappings = append(mappings, Mapping{
-			Name:      match[1],
-			Namespace: match[2],
-			Value:     match[3],
-		})
+func extractMappings(shaderSources []glsl.Source) ([]Mapping, error) {
+	mappings := []Mapping{}
+	for _, s := range shaderSources {
+		src, err := s.Contents()
+		if err != nil {
+			return nil, err
+		}
+		matches := inputMappingSourceRe.FindAllSubmatch(src, -1)
+		for _, match := range matches {
+			mappings = append(mappings, Mapping{
+				Name:      string(match[1]),
+				Namespace: string(match[2]),
+				Value:     string(match[3]),
+			})
+		}
 	}
-	return mappings
+	return deduplicateMappings(mappings...), nil
 }
 
 // deduplicateMappings filters out mappings which appear multiple times in the
 // specified lists by their name.
 //
 // Lists specified first have precedence.
-func deduplicateMappings(inMappings ...[]Mapping) []Mapping {
+func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	var outMappings []Mapping
 	set := map[string]bool{}
-	for _, list := range inMappings {
-		for _, m := range list {
-			// Deduplicate by using map keys.
-			if !set[m.Name] {
-				set[m.Name] = true
-				outMappings = append(outMappings, m)
-			}
+	for _, m := range inMappings {
+		// Deduplicate by using map keys.
+		if !set[m.Name] {
+			set[m.Name] = true
+			outMappings = append(outMappings, m)
 		}
 	}
 	return outMappings

@@ -11,18 +11,18 @@ import (
 	"github.com/polyfloyd/shady"
 )
 
-const shaderPlain = `
+const shaderPlain = glsl.SourceBuf(`
 	void main(void) {
 		gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 	}
-`
-const shaderWave = `
+`)
+const shaderWave = glsl.SourceBuf(`
 	void main(void) {
 		gl_FragColor = vec4(cos(gl_FragCoord.x), sin(gl_FragCoord.y), 0.0, 1.0);
 	}
-`
+`)
 
-var sources = map[string]string{
+var sources = map[string]glsl.Source{
 	"plain": shaderPlain,
 	"wave":  shaderWave,
 }
@@ -33,7 +33,7 @@ func BenchmarkCompile(b *testing.B) {
 	}
 
 	for name, source := range sources {
-		env := GLSLSandbox{Source: source}
+		env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
@@ -54,7 +54,7 @@ func BenchmarkRenderImage(b *testing.B) {
 	}
 
 	for name, source := range sources {
-		env := GLSLSandbox{Source: source}
+		env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
@@ -78,7 +78,7 @@ func BenchmarkRenderAnimation(b *testing.B) {
 	}
 
 	for name, source := range sources {
-		env := GLSLSandbox{Source: source}
+		env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 

@@ -23,12 +23,16 @@ func init() {
 // GLSLSandbox implements the Environment interface to simulate the canvas of glslsandbox.com.
 type GLSLSandbox struct {
 	// Source is the single fragment shader that should be used for rendering.
-	Source string
+	ShaderSources []glsl.Source
 }
 
-func (gs GLSLSandbox) Sources() map[glsl.Stage][]string {
-	return map[glsl.Stage][]string{
-		glsl.StageVertex: {`
+func (gs GLSLSandbox) Sources() (map[glsl.Stage][]glsl.Source, error) {
+	ss := make([]glsl.Source, 0, len(gs.ShaderSources))
+	for _, s := range gs.ShaderSources {
+		ss = append(ss, s)
+	}
+	return map[glsl.Stage][]glsl.Source{
+		glsl.StageVertex: {glsl.SourceBuf(`
 			attribute vec3 vert;
 			varying vec2 surfacePosition;
 
@@ -36,9 +40,9 @@ func (gs GLSLSandbox) Sources() map[glsl.Stage][]string {
 				surfacePosition = vert.xy;
 				gl_Position = vec4(vert, 1.0);
 			}
-		`},
-		glsl.StageFragment: {gs.Source},
-	}
+		`)},
+		glsl.StageFragment: ss,
+	}, nil
 }
 
 func (GLSLSandbox) Setup() error { return nil }
