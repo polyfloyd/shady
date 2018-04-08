@@ -31,7 +31,8 @@ func main() {
 		formatNames = append(formatNames, name)
 	}
 
-	inputFile := flag.String("i", "", "The shader file to use")
+	var inputFiles arrayFlags
+	flag.Var(&inputFiles, "i", "The shader file(s) to use")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
 	envName := flag.String("env", "", "The environment (aka website) to simulate. Valid values are \"glslsandbox\", \"shadertoy\" or \"\" to autodetect")
@@ -82,7 +83,7 @@ func main() {
 	}
 
 	// Load the shader sources.
-	sources, err := glsl.Includes(*inputFile)
+	sources, err := glsl.Includes([]string(inputFiles)...)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
@@ -113,12 +114,6 @@ func main() {
 		}
 		env = glslsandbox.GLSLSandbox{ShaderSources: ss}
 	case "shadertoy":
-		var resolveDir string
-		if *inputFile == "-" {
-			resolveDir = "."
-		} else {
-			resolveDir = filepath.Dir(*inputFile)
-		}
 		mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
 		for _, str := range shadertoyMappings {
 			m, err := shadertoy.ParseMapping(str)
@@ -129,7 +124,7 @@ func main() {
 		}
 		env = &shadertoy.ShaderToy{
 			ShaderSources: sources,
-			ResolveDir:    resolveDir,
+			ResolveDir:    filepath.Dir(inputFiles[len(inputFiles)-1]),
 			Mappings:      mappings,
 		}
 	default:
