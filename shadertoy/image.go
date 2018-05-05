@@ -59,8 +59,8 @@ func newImageTexture(img image.Image, uniformName string) (*imageTexture, error)
 
 func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
 	if loc, ok := uniforms[tex.uniformName]; ok {
-		gl.BindTexture(gl.TEXTURE_2D, tex.id)
 		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
+		gl.BindTexture(gl.TEXTURE_2D, tex.id)
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {

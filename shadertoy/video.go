@@ -82,6 +82,7 @@ func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 	}
 
 	if loc, ok := uniforms[vt.uniformName]; ok {
+		gl.ActiveTexture(gl.TEXTURE0 + vt.index)
 		gl.BindTexture(gl.TEXTURE_2D, vt.id)
 		gl.TexSubImage2D(
 			gl.TEXTURE_2D, // target,
@@ -94,7 +95,6 @@ func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 			gl.UNSIGNED_BYTE, // type,
 			gl.Ptr(frame),    // data
 		)
-		gl.ActiveTexture(gl.TEXTURE0 + vt.index)
 		gl.Uniform1i(loc.Location, int32(vt.index))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
