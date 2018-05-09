@@ -228,7 +228,7 @@ func parseGeometry(geom string) (uint, uint, error) {
 		}
 	}
 
-	re := regexp.MustCompile("^(\\d+)x(\\d+)$")
+	re := regexp.MustCompile(`^(\d+)x(\d+)$`)
 	matches := re.FindStringSubmatch(geom)
 	if matches == nil {
 		return 0, 0, fmt.Errorf("invalid geometry: %q", geom)
@@ -266,5 +266,3 @@ func (i *arrayFlags) Set(value string) error {
 	*i = append(*i, value)
 	return nil
 }
-
-var myFlags arrayFlags

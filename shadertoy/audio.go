@@ -17,8 +17,8 @@ import (
 const audioTexWidth = 512
 
 var (
-	audioGenericValueRe = regexp.MustCompile("^([^;]+)$")
-	audioPCMValueRe     = regexp.MustCompile("^([^;]+);(\\d+):(\\d+):([su]\\d{1,2}[lb]e)$")
+	audioGenericValueRe = regexp.MustCompile(`^([^;]+)$`)
+	audioPCMValueRe     = regexp.MustCompile(`^([^;]+);(\d+):(\d+):([su]\d{1,2}[lb]e)$`)
 )
 
 type format string
