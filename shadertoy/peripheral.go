@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	periphFile   = regexp.MustCompile("^([^;]+)$")
-	periphSerial = regexp.MustCompile("^([^;]+);(\\d+)$")
+	periphFile   = regexp.MustCompile(`^([^;]+)(\??)$`)
+	periphSerial = regexp.MustCompile(`^([^;]+);(\d+)(\??)$`)
 )
 
 type periphMat4 struct {
@@ -27,23 +27,30 @@ type periphMat4 struct {
 
 func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
 	var reader io.ReadCloser
+	var err error
+	var failSilent bool
 	if match := periphFile.FindStringSubmatch(value); match != nil {
-		fd, err := os.Open(resolvePath(pwd, match[1]))
-		if err != nil {
-			return nil, err
+		failSilent = match[2] != ""
+		var fd *os.File
+		fd, err = os.Open(resolvePath(pwd, match[1]))
+		if err == nil {
+			reader = fd
 		}
-		reader = fd
 
 	} else if match := periphSerial.FindStringSubmatch(value); match != nil {
+		failSilent = match[3] != ""
 		baudrate, _ := strconv.Atoi(match[2])
-		ser, err := serial.OpenPort(&serial.Config{
+		var ser *serial.Port
+		ser, err = serial.OpenPort(&serial.Config{
 			Name: match[1],
 			Baud: baudrate,
 		})
-		if err != nil {
-			return nil, err
+		if err == nil {
+			reader = ser
 		}
-		reader = ser
+	}
+	if err != nil && !failSilent {
+		return nil, err
 	}
 
 	pr := &periphMat4{
@@ -54,6 +61,9 @@ func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
 			0, 0, 1, 0,
 			0, 0, 0, 1,
 		},
+	}
+	if reader == nil {
+		return pr, nil
 	}
 
 	go func() {
