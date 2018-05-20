@@ -2,6 +2,7 @@ package shadertoy
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"regexp"
@@ -47,6 +48,8 @@ func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
 		})
 		if err == nil {
 			reader = ser
+		} else if ser == nil {
+			err = fmt.Errorf("Serial device %q not found", match[1])
 		}
 	}
 	if err != nil && !failSilent {
