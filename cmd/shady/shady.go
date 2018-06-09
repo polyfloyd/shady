@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/polyfloyd/shady"
@@ -25,6 +24,9 @@ import (
 
 func main() {
 	log.SetOutput(os.Stderr)
+	// Lock this goroutine to the current thread. This is required because
+	// OpenGL contexts are bounds to threads.
+	runtime.LockOSThread()
 
 	formatNames := make([]string, 0, len(encode.Formats))
 	for name := range encode.Formats {
@@ -65,6 +67,7 @@ func main() {
 	if *realtime && *framerate == 0 {
 		log.Fatalf("-rt is set while -framerate is not set")
 	}
+	interval := time.Duration(float64(time.Second) / *framerate)
 
 	// Figure out the dimensions of the display.
 	width, height, err := parseGeometry(*geometry)
@@ -88,10 +91,6 @@ func main() {
 		log.Fatalf("%v\n", err)
 	}
 
-	// Lock this goroutine to the current thread. This is required because
-	// OpenGL contexts are bounds to threads.
-	runtime.LockOSThread()
-
 	if *envName == "" {
 		for i := 0; *envName == "" && i < len(sources); i++ {
 			src, err := sources[i].Contents()
@@ -104,6 +103,23 @@ func main() {
 			log.Fatalf("Unable to detect the environment to use. Please set it using -env")
 		}
 	}
+
+	// Open the output.
+	outWriter, err := openWriter(*outputFile)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	defer outWriter.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, os.Interrupt)
+		<-sig
+		signal.Stop(sig)
+		cancel()
+	}()
 
 	var env glsl.Environment
 	switch *envName {
@@ -138,14 +154,7 @@ func main() {
 	}
 	defer sh.Close()
 
-	// Open the output.
-	outWriter, err := openWriter(*outputFile)
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
-	defer outWriter.Close()
-
-	if *framerate <= 0 {
+	if *framerate <= 0 || animateNumFrames == 1 {
 		img := sh.Image()
 		// We're not dealing with an animation, just export a single image.
 		if err := format.Encode(outWriter, img); err != nil {
@@ -154,70 +163,89 @@ func main() {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	interval := time.Duration(float64(time.Second) / *framerate)
-	imgStream := make(chan image.Image, int(*framerate)+1)
-	counterStream := make(chan image.Image)
-	var waitgroup sync.WaitGroup
-	waitgroup.Add(2)
+	in := make(chan image.Image, 10)
+	out := (<-chan image.Image)(in)
+	if animateNumFrames > 0 {
+		out = limitNumFramesl(out, animateNumFrames)
+	}
+	if *realtime {
+		out = limitFramerate(out, interval)
+	}
+	if *verbose {
+		out = printStats(out, interval, animateNumFrames)
+	}
+	done := make(chan struct{})
 	go func() {
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, os.Interrupt)
-		<-sig
-		signal.Stop(sig)
-		cancel()
-	}()
-	go func() {
-		if err := format.EncodeAnimation(outWriter, counterStream, interval); err != nil {
+		if err := format.EncodeAnimation(outWriter, out, interval); err != nil {
 			log.Printf("Error animating: %v", err)
 			cancel()
-			go func() {
-				// Prevent deadlocking the counter routine.
-				for range counterStream {
-				}
-			}()
 		}
-		waitgroup.Done()
+		close(done)
 	}()
+
+	sh.Animate(ctx, interval, in)
+	close(in)
+	<-done
+}
+
+func limitNumFramesl(in <-chan image.Image, desiredTotalNumFrames uint) <-chan image.Image {
+	out := make(chan image.Image)
 	go func() {
-		defer close(counterStream)
-		lastFrame := time.Now()
-		var frame uint
-		for img := range imgStream {
-			renderTime := time.Since(lastFrame)
-			fps := 1.0 / (float64(renderTime) / float64(time.Second))
-			speed := float64(interval) / float64(renderTime)
-			lastFrame = time.Now()
+		defer close(out)
+		frame := uint(0)
+		for img := range in {
 			frame++
-
-			if *verbose {
-				var frameTarget string
-				if animateNumFrames == 0 {
-					frameTarget = "∞"
-				} else {
-					frameTarget = fmt.Sprintf("%d", animateNumFrames)
-				}
-				fmt.Fprintf(os.Stderr, "\rfps=%.2f frames=%d/%s speed=%.2f", fps, frame, frameTarget, speed)
-			}
-
-			if *realtime {
-				time.Sleep(interval - renderTime)
-			}
-			counterStream <- img
-			if frame == animateNumFrames {
-				cancel()
+			out <- img
+			if frame >= desiredTotalNumFrames {
 				break
 			}
 		}
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "\n")
-		}
-		waitgroup.Done()
 	}()
-	sh.Animate(ctx, interval, imgStream)
-	close(imgStream)
-	waitgroup.Wait()
+	return out
+}
+
+func limitFramerate(in <-chan image.Image, interval time.Duration) <-chan image.Image {
+	if interval == 0 {
+		return in
+	}
+	out := make(chan image.Image)
+	go func() {
+		defer close(out)
+		lastFrame := time.Now()
+		for img := range in {
+			time.Sleep(interval - time.Since(lastFrame))
+			lastFrame = time.Now()
+			out <- img
+		}
+	}()
+	return out
+}
+
+func printStats(in <-chan image.Image, desiredInterval time.Duration, desiredTotalNumFrames uint) <-chan image.Image {
+	out := make(chan image.Image)
+	go func() {
+		defer close(out)
+		frame := uint(0)
+		lastFrame := time.Now()
+		var frameTarget string
+		if desiredTotalNumFrames == 0 {
+			frameTarget = "∞"
+		} else {
+			frameTarget = fmt.Sprintf("%d", desiredTotalNumFrames)
+		}
+		for img := range in {
+			renderTime := time.Since(lastFrame)
+			fps := 1.0 / (float64(renderTime) / float64(time.Second))
+			speed := float64(desiredInterval) / float64(renderTime)
+			lastFrame = time.Now()
+			frame++
+			fmt.Fprintf(os.Stderr, "\rfps=%.2f frames=%d/%s speed=%.2f", fps, frame, frameTarget, speed)
+
+			out <- img
+		}
+	}()
+	fmt.Fprintf(os.Stderr, "\n")
+	return out
 }
 
 func parseGeometry(geom string) (uint, uint, error) {
