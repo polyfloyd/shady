@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/fsnotify/fsnotify"
+  packages = ["."]
+  revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
+  version = "v1.4.7"
+
+[[projects]]
   branch = "master"
   name = "github.com/go-gl/gl"
   packages = ["v3.3-core/gl"]
@@ -31,6 +37,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "117d16eb29db905ed6eee9ff167a9f3c7860ea2768e4f3f4f113801d22978cd1"
+  inputs-digest = "d4f0a4245b7f93fb574d2d15b6e3e00f9b060f78ec697cf189591e35f5232829"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -1,11 +1,15 @@
 [[constraint]]
-  branch = "master"
   name = "github.com/go-gl/gl"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/mjibson/go-dsp"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/tarm/serial"
+  branch = "master"
+
+[[constraint]]
+  name = "github.com/fsnotify/fsnotify"
+  version = "1.4.7"

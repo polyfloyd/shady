@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/polyfloyd/shady"
 	"github.com/polyfloyd/shady/encode"
 	"github.com/polyfloyd/shady/glslsandbox"
@@ -44,6 +46,7 @@ func main() {
 	duration := flag.Float64("duration", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
 	realtime := flag.Bool("rt", false, "Render at the actual number of frames per second set by -framerate")
 	verbose := flag.Bool("v", false, "Show verbose output about rendering")
+	watch := flag.Bool("w", false, "Watch the shader source files for changes")
 	var shadertoyMappings arrayFlags
 	flag.Var(&shadertoyMappings, "map", "Specify or override ShaderToy input mappings")
 	flag.Parse()
@@ -63,6 +66,9 @@ func main() {
 			log.Fatalf("-duration is set while -framerate is not set")
 		}
 		animateNumFrames = uint(*duration * *framerate)
+	}
+	if *framerate <= 0 {
+		animateNumFrames = 1
 	}
 	if *realtime && *framerate == 0 {
 		log.Fatalf("-rt is set while -framerate is not set")
@@ -85,25 +91,6 @@ func main() {
 		log.Fatalf("Unknown output format: %q", *outputFile)
 	}
 
-	// Load the shader sources.
-	sources, err := glsl.Includes([]string(inputFiles)...)
-	if err != nil {
-		log.Fatalf("%v\n", err)
-	}
-
-	if *envName == "" {
-		for i := 0; *envName == "" && i < len(sources); i++ {
-			src, err := sources[i].Contents()
-			if err != nil {
-				log.Fatal(err)
-			}
-			*envName = glsl.DetectEnvironment(string(src))
-		}
-		if *envName == "" {
-			log.Fatalf("Unable to detect the environment to use. Please set it using -env")
-		}
-	}
-
 	// Open the output.
 	outWriter, err := openWriter(*outputFile)
 	if err != nil {
@@ -121,48 +108,6 @@ func main() {
 		cancel()
 	}()
 
-	var env glsl.Environment
-	switch *envName {
-	case "glslsandbox":
-		ss := make([]glsl.Source, 0, len(sources))
-		for _, s := range sources {
-			ss = append(ss, s)
-		}
-		env = glslsandbox.GLSLSandbox{ShaderSources: ss}
-	case "shadertoy":
-		mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
-		for _, str := range shadertoyMappings {
-			m, err := shadertoy.ParseMapping(str)
-			if err != nil {
-				log.Fatalf("%v", err)
-			}
-			mappings = append(mappings, m)
-		}
-		env = &shadertoy.ShaderToy{
-			ShaderSources: sources,
-			ResolveDir:    filepath.Dir(inputFiles[len(inputFiles)-1]),
-			Mappings:      mappings,
-		}
-	default:
-		log.Fatalf("Unknown environment: %q", *envName)
-	}
-
-	// Compile the shader.
-	sh, err := glsl.NewShader(width, height, env)
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
-	defer sh.Close()
-
-	if *framerate <= 0 || animateNumFrames == 1 {
-		img := sh.Image()
-		// We're not dealing with an animation, just export a single image.
-		if err := format.Encode(outWriter, img); err != nil {
-			log.Fatalf("%v", err)
-		}
-		return
-	}
-
 	in := make(chan image.Image, 10)
 	out := (<-chan image.Image)(in)
 	if animateNumFrames > 0 {
@@ -174,18 +119,127 @@ func main() {
 	if *verbose {
 		out = printStats(out, interval, animateNumFrames)
 	}
-	done := make(chan struct{})
 	go func() {
 		if err := format.EncodeAnimation(outWriter, out, interval); err != nil {
 			log.Printf("Error animating: %v", err)
-			cancel()
 		}
-		close(done)
+		cancel()
 	}()
 
-	sh.Animate(ctx, interval, in)
-	close(in)
-	<-done
+	for ctx.Err() == nil {
+		loopCtx, loopCancel := context.WithCancel(ctx)
+
+		sh, watcher, err := func() (*glsl.Shader, *fsnotify.Watcher, error) {
+			watcher, err := fsnotify.NewWatcher()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			// Load the shader sources.
+			sources, err := glsl.Includes([]string(inputFiles)...)
+			if err != nil {
+				for _, src := range inputFiles {
+					watcher.Add(src)
+				}
+				return nil, watcher, err
+			}
+			for _, src := range sources {
+				watcher.Add(src.Filename)
+			}
+
+			if *envName == "" {
+				for i := 0; *envName == "" && i < len(sources); i++ {
+					src, err := sources[i].Contents()
+					if err != nil {
+						return nil, watcher, err
+					}
+					*envName = glsl.DetectEnvironment(string(src))
+				}
+				if *envName == "" {
+					return nil, watcher, fmt.Errorf("Unable to detect the environment to use. Please set it using -env")
+				}
+			}
+
+			var env glsl.Environment
+			switch *envName {
+			case "glslsandbox":
+				ss := make([]glsl.Source, 0, len(sources))
+				for _, s := range sources {
+					ss = append(ss, s)
+				}
+				env = glslsandbox.GLSLSandbox{ShaderSources: ss}
+			case "shadertoy":
+				mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
+				for _, str := range shadertoyMappings {
+					m, err := shadertoy.ParseMapping(str)
+					if err != nil {
+						return nil, watcher, err
+					}
+					mappings = append(mappings, m)
+				}
+				env = &shadertoy.ShaderToy{
+					ShaderSources: sources,
+					ResolveDir:    filepath.Dir(inputFiles[len(inputFiles)-1]),
+					Mappings:      mappings,
+				}
+			default:
+				return nil, watcher, fmt.Errorf("Unknown environment: %q", *envName)
+			}
+
+			// Compile the shader.
+			sh, err := glsl.NewShader(width, height, env)
+			if err != nil {
+				return nil, watcher, err
+			}
+			return sh, watcher, nil
+		}()
+		if err != nil {
+			log.Println(err)
+			_ = watch
+			if !*watch {
+				watcher.Close()
+				loopCancel()
+				break
+			}
+			select {
+			case <-watcher.Events:
+			case err := <-watcher.Errors:
+				log.Println(err)
+			case <-loopCtx.Done():
+				loopCancel()
+				break
+			}
+			watcher.Close()
+			loopCancel()
+			continue
+		}
+
+		if *watch {
+			go func() {
+				select {
+				case <-watcher.Events:
+					t := time.NewTimer(time.Millisecond * 20)
+				outer:
+					for {
+						select {
+						case <-watcher.Events:
+						case <-t.C:
+							break outer
+						}
+					}
+					loopCancel()
+				case err := <-watcher.Errors:
+					log.Println(err)
+				case <-loopCtx.Done():
+				}
+			}()
+		}
+
+		sh.Animate(loopCtx, interval, in)
+		watcher.Close()
+		sh.Close()
+		loopCancel()
+	}
 }
 
 func limitNumFramesl(in <-chan image.Image, desiredTotalNumFrames uint) <-chan image.Image {
