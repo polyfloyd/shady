@@ -11,7 +11,7 @@
   branch = "master"
   name = "github.com/go-gl/gl"
   packages = ["v3.3-core/gl"]
-  revision = "ac0d3d2af0fe995e2bb09fa6619b716b0c0fc0fa"
+  revision = "68e2537930806bfcee1b92a0e14b4e9b8bb3a3e3"
 
 [[projects]]
   branch = "master"
@@ -20,7 +20,7 @@
     "dsputils",
     "fft"
   ]
-  revision = "49dba83727078f13a0e99553e0f8140990115ac9"
+  revision = "11479a337f1259210b7c8f93f7bf2b0cc87b066e"
 
 [[projects]]
   branch = "master"
@@ -32,7 +32,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "dd2ff4accc098aceecb86b36eaa7829b2a17b1c9"
+  revision = "9527bec2660bd847c050fda93a0f0c6dee0800bb"
 
 [solve-meta]
   analyzer-name = "dep"
