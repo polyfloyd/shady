@@ -102,10 +102,16 @@ func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 			gl.Uniform3f(loc.Location, float32(vt.resolution.Dx()), float32(vt.resolution.Dy()), 1.0)
 		}
 	}
+	if loc, ok := uniforms[fmt.Sprintf("%sSize", vt.uniformName)]; ok {
+		gl.Uniform3f(loc.Location, float32(vt.resolution.Dx()), float32(vt.resolution.Dy()), 1.0)
+	}
 	if m := ichannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
 		if loc, ok := uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
 			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 		}
+	}
+	if loc, ok := uniforms[fmt.Sprintf("%sCurTime", vt.uniformName)]; ok {
+		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
 }
 
