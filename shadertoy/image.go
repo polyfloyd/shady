@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/polyfloyd/shady"
@@ -78,6 +79,9 @@ func noise(rect image.Rectangle) image.Image {
 }
 
 func resolvePath(pwd, path string) string {
+	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
+		return path
+	}
 	if len(path) > 0 && path[0] == '~' {
 		home := os.Getenv("HOME")
 		if home == "" {
