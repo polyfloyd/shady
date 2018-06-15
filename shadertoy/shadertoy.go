@@ -59,9 +59,7 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 
 	mappedUniforms := make([]string, 0, len(mappings))
 	for _, mapping := range mappings {
-		if typ, ok := mapping.samplerType(); ok {
-			mappedUniforms = append(mappedUniforms, fmt.Sprintf("uniform %s %s;", typ, mapping.Name))
-		}
+		mappedUniforms = append(mappedUniforms, mapping.uniformSource())
 	}
 
 	return map[glsl.Stage][]glsl.Source{
@@ -211,28 +209,34 @@ func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	return outMappings
 }
 
-func (m Mapping) samplerType() (string, bool) {
+func (m Mapping) uniformSource() string {
 	if m.Namespace == "builtin" {
 		switch m.Value {
-		case "RGBA Noise Small":
-			return "sampler2D", true
-		case "RGBA Noise Medium":
-			return "sampler2D", true
+		case "RGBA Noise Small", "RGBA Noise Medium":
+			return fmt.Sprintf(`
+				uniform sampler2D %s;
+				uniform vec3 %sSize;
+			`, m.Name, m.Name)
 		default:
-			return "", false
+			return "\n"
 		}
 	}
 	switch m.Namespace {
-	case "audio":
-		return "sampler2D", true
 	case "image":
-		return "sampler2D", true
-	case "video":
-		return "sampler2D", true
+		return fmt.Sprintf(`
+			uniform sampler2D %s;
+			uniform vec3 %sSize;
+		`, m.Name, m.Name)
+	case "audio", "video":
+		return fmt.Sprintf(`
+			uniform sampler2D %s;
+			uniform vec3 %sSize;
+			uniform float %sCurTime;
+		`, m.Name, m.Name, m.Name)
 	case "perip_mat4":
-		return "mat4", true
+		return fmt.Sprintf("uniform mat4 %s;", m.Name)
 	default:
-		return "", false
+		return "\n"
 	}
 }
 

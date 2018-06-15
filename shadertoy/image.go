@@ -69,6 +69,9 @@ func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.
 			gl.Uniform3f(loc.Location, float32(tex.rect.Dx()), float32(tex.rect.Dy()), 1.0)
 		}
 	}
+	if loc, ok := uniforms[fmt.Sprintf("%sSize", tex.uniformName)]; ok {
+		gl.Uniform3f(loc.Location, float32(tex.rect.Dx()), float32(tex.rect.Dy()), 1.0)
+	}
 }
 
 func noise(rect image.Rectangle) image.Image {

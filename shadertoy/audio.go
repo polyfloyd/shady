@@ -153,13 +153,19 @@ func (at *audioTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 	}
 	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
 		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
-			gl.Uniform3f(loc.Location, float32(audioTexWidth), float32(2), 1.0)
+			gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
 		}
+	}
+	if loc, ok := uniforms[fmt.Sprintf("%sSize", at.uniformName)]; ok {
+		gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
 	}
 	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
 		if loc, ok := uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
 			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 		}
+	}
+	if loc, ok := uniforms[fmt.Sprintf("%sCurTime", at.uniformName)]; ok {
+		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
 	if loc, ok := uniforms["iSampleRate"]; ok {
 		gl.Uniform1f(loc.Location, at.source.SampleRate())
