@@ -130,7 +130,10 @@ func decodeVideoFile(filename string) (image.Rectangle, time.Duration, <-chan in
 	s := strings.Split(videoInfo.AvgFrameRate, "/")
 	nu, _ := strconv.Atoi(s[0])
 	de, _ := strconv.Atoi(s[1])
-	interval := time.Duration(float64(time.Second) / (float64(nu) / float64(de)))
+	interval := time.Second
+	if nu != 0 && de != 0 {
+		interval = time.Duration(float64(time.Second) / (float64(nu) / float64(de)))
+	}
 
 	out := make(chan interface{}, 4)
 	go func() {
