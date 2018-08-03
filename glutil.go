@@ -2,12 +2,15 @@ package glsl
 
 import (
 	"fmt"
+	"io"
 	"runtime"
 	"strings"
 	"unsafe"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 )
+
+const sourceSeparator = "\n\n"
 
 type GLDebugMessage struct {
 	ID       uint32
@@ -61,10 +64,24 @@ func GLDebugOutput() <-chan GLDebugMessage {
 	return ch
 }
 
-func compileShader(typ uint32, source string) (uint32, error) {
-	shader := gl.CreateShader(typ)
+func compileShader(stage Stage, sources ...Source) (uint32, error) {
+	glStage, err := stage.glEnum()
+	if err != nil {
+		return 0, err
+	}
 
-	csources, free := gl.Strs(source + "\x00")
+	var src string
+	for _, s := range sources {
+		c, err := s.Contents()
+		if err != nil {
+			return 0, err
+		}
+		src += string(c)
+		src += sourceSeparator
+	}
+
+	shader := gl.CreateShader(glStage)
+	csources, free := gl.Strs(src + "\x00")
 	gl.ShaderSource(shader, 1, csources, nil)
 	free()
 	gl.CompileShader(shader)
@@ -77,15 +94,16 @@ func compileShader(typ uint32, source string) (uint32, error) {
 		log := strings.Repeat("\x00", int(logLen+1))
 		gl.GetShaderInfoLog(shader, logLen, nil, gl.Str(log))
 		gl.DeleteShader(shader)
-		return 0, shaderError{
-			stage:   typ,
-			message: log,
+		return 0, CompileError{
+			sources: sources,
+			stage:   stage,
+			log:     log,
 		}
 	}
 	return shader, nil
 }
 
-func linkProgram(typedSources map[uint32]string) (uint32, error) {
+func linkProgram(sources map[Stage][]Source) (uint32, error) {
 	shaders := map[uint32]uint32{}
 	freeShaders := func() {
 		for _, sh := range shaders {
@@ -93,13 +111,17 @@ func linkProgram(typedSources map[uint32]string) (uint32, error) {
 		}
 	}
 
-	for typ, source := range typedSources {
-		sh, err := compileShader(typ, source)
+	for stage, source := range sources {
+		sh, err := compileShader(stage, source...)
 		if err != nil {
 			freeShaders()
 			return 0, err
 		}
-		shaders[typ] = sh
+		glStage, err := stage.glEnum()
+		if err != nil {
+			return 0, err
+		}
+		shaders[glStage] = sh
 	}
 
 	program := gl.CreateProgram()
@@ -116,7 +138,7 @@ func linkProgram(typedSources map[uint32]string) (uint32, error) {
 		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLen)
 		log := strings.Repeat("\x00", int(logLen+1))
 		gl.GetProgramInfoLog(program, logLen, nil, gl.Str(log))
-		linkErr = shaderError{message: log}
+		linkErr = LinkError{log: log}
 	}
 
 	for _, sh := range shaders {
@@ -130,20 +152,34 @@ func linkProgram(typedSources map[uint32]string) (uint32, error) {
 	return program, nil
 }
 
-type shaderError struct {
-	stage uint32
+type CompileError struct {
+	sources []Source
 
-	message string
+	stage Stage
+	log   string
 }
 
-func (err shaderError) Error() (str string) {
-	if err.stage == gl.VERTEX_SHADER {
+func (err CompileError) Error() (str string) {
+	if err.stage == StageVertex {
 		str += "Error compiling vertex shader:\n"
-	} else if err.stage == gl.FRAGMENT_SHADER {
+	} else if err.stage == StageFragment {
 		str += "Error compiling fragment shader:\n"
 	}
-	str += err.message
+	str += err.log
 	return
+}
+
+func (err CompileError) PrettyPrint(out io.Writer, color bool) {
+}
+
+type LinkError struct {
+	sources map[Stage][]Source
+
+	log string
+}
+
+func (err LinkError) Error() (str string) {
+	return err.log
 }
 
 type Uniform struct {

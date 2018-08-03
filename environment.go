@@ -26,9 +26,8 @@ func (stage Stage) glEnum() (uint32, error) {
 		return gl.VERTEX_SHADER, nil
 	case StageFragment:
 		return gl.FRAGMENT_SHADER, nil
-	default:
-		return 0, fmt.Errorf("invalid pipeline stage: %q", stage)
 	}
+	return 0, fmt.Errorf("invalid pipeline stage: %q", stage)
 }
 
 type Environment interface {

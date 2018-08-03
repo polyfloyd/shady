@@ -79,25 +79,9 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 	}
 
 	// Set up the shader.
-	rawSources, err := env.Sources()
+	sources, err := env.Sources()
 	if err != nil {
 		return nil, err
-	}
-
-	sources := map[uint32]string{}
-	for stage, ss := range rawSources {
-		e, err := stage.glEnum()
-		if err != nil {
-			return nil, err
-		}
-		for _, src := range ss {
-			c, err := src.Contents()
-			if err != nil {
-				return nil, err
-			}
-			sources[e] += string(c)
-			sources[e] += "\n\n"
-		}
 	}
 	sh.program, err = linkProgram(sources)
 	if err != nil {
