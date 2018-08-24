@@ -10,6 +10,8 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"os"
+	"os/exec"
 	"time"
 )
 
@@ -199,6 +201,58 @@ func (f *AnsiDisplay) EncodeAnimation(w io.Writer, stream <-chan image.Image, in
 
 		time.Sleep(interval - time.Since(lastFrame))
 		lastFrame = time.Now()
+	}
+	return nil
+}
+
+type X11Display struct{}
+
+func (f X11Display) Extensions() []string {
+	return []string{}
+}
+
+func (f X11Display) Encode(w io.Writer, img image.Image) error {
+	// Forward to the code stream encoder for easy code reuse.
+	stream := make(chan image.Image, 1)
+	stream <- img
+	close(stream)
+	return f.EncodeAnimation(w, stream, 0)
+}
+
+func (f *X11Display) EncodeAnimation(w io.Writer, stream <-chan image.Image, interval time.Duration) error {
+	firstImage, ok := <-stream
+	if !ok {
+		return nil
+	}
+	width, height := firstImage.Bounds().Dx(), firstImage.Bounds().Dy()
+
+	cmd := exec.Command(
+		"ffplay",
+		"-f", "rawvideo",
+		"-pixel_format", "rgb24",
+		"-video_size", fmt.Sprintf("%dx%d", width, height),
+		"-framerate", fmt.Sprintf("%f", 1./interval.Seconds()),
+		"-",
+	)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stderr
+	ffIn, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	defer cmd.Wait()
+
+	ofmt := RGB24Format{}
+	if err := ofmt.Encode(ffIn, firstImage); err != nil {
+		return err
+	}
+	for img := range stream {
+		if err := ofmt.Encode(ffIn, img); err != nil {
+			return err
+		}
 	}
 	return nil
 }
