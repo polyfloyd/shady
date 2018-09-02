@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
+
 	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/shadertoy/kinect"
 )
 
 func init() {
@@ -227,7 +229,7 @@ func (m Mapping) uniformSource() string {
 			uniform sampler2D %s;
 			uniform vec3 %sSize;
 		`, m.Name, m.Name)
-	case "audio", "video":
+	case "audio", "video", "kinect":
 		return fmt.Sprintf(`
 			uniform sampler2D %s;
 			uniform vec3 %sSize;
@@ -276,6 +278,14 @@ func (m Mapping) resource(pwd string) (resource, error) {
 
 	case "perip_mat4":
 		return newMat4Peripheral(m.Name, pwd, m.Value)
+
+	case "kinect":
+		kin, err := kinect.Open(m.Name, texIndexEnum)
+		if err != nil {
+			return nil, err
+		}
+		texIndexEnum++
+		return kin, nil
 
 	default:
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
