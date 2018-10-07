@@ -16,6 +16,13 @@ import (
 func init() {
 	resourceBuilders["builtin"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
 		switch m.Value {
+		case "Back Buffer":
+			r := &backBufferImage{
+				uniformName: m.Name,
+				index:       *texIndexEnum,
+			}
+			*texIndexEnum++
+			return r, nil
 		case "RGBA Noise Small": // 64x64 4channels uint8
 			r, err := newImageTexture(noise(image.Rect(0, 0, 64, 64)), m.Name, *texIndexEnum)
 			*texIndexEnum++
@@ -116,6 +123,34 @@ func noise(rect image.Rectangle) image.Image {
 	rng := rand.New(rand.NewSource(1337))
 	rng.Read(img.Pix)
 	return img
+}
+
+type backBufferImage struct {
+	uniformName string
+	index       uint32
+}
+
+func (tex *backBufferImage) UniformSource() string {
+	return fmt.Sprintf(`
+		uniform sampler2D %s;
+		uniform vec3 %sSize;
+	`, tex.uniformName, tex.uniformName)
+}
+
+func (tex *backBufferImage) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
+	if loc, ok := uniforms[tex.uniformName]; ok {
+		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
+		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID())
+		gl.Uniform1i(loc.Location, int32(tex.index))
+	}
+	if m := ichannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
+		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+			gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 1.0)
+		}
+	}
+	if loc, ok := uniforms[fmt.Sprintf("%sSize", tex.uniformName)]; ok {
+		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 1.0)
+	}
 }
 
 func resolvePath(pwd, path string) string {

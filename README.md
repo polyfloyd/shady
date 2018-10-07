@@ -61,6 +61,7 @@ found on ShaderToy. Setting the namespace to `image` interprets the value as a
 path relative to the shader source file to use as texture.
 
 Accepted values for `builtin` are:
+* `Back Buffer`
 * `RGBA Noise Small`
 * `RGBA Noise Medium`
 
