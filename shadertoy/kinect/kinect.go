@@ -132,6 +132,14 @@ func (kin *Kinect) Close() error {
 	return nil
 }
 
+func (kin *Kinect) UniformSource() string {
+	return fmt.Sprintf(`
+		uniform sampler2D %s;
+		uniform vec3 %sSize;
+		uniform float %sCurTime;
+	`, kin.uniformName, kin.uniformName, kin.uniformName)
+}
+
 func (kin *Kinect) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()

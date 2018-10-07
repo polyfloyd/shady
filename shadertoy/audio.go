@@ -14,6 +14,18 @@ import (
 	"github.com/polyfloyd/shady"
 )
 
+func init() {
+	resourceBuilders["audio"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+		source, err := parseMappingValue(pwd, m.Value)
+		if err != nil {
+			return nil, err
+		}
+		r, err := newAudioTexture(m.Name, source, *texIndexEnum)
+		*texIndexEnum++
+		return r, err
+	}
+}
+
 const audioTexWidth = 512
 
 var (
@@ -87,13 +99,12 @@ type audioTexture struct {
 	source      audioSource
 }
 
-func newAudioTexture(uniformName string, source audioSource) (*audioTexture, error) {
+func newAudioTexture(uniformName string, source audioSource, texIndex uint32) (*audioTexture, error) {
 	at := &audioTexture{
 		uniformName: uniformName,
-		index:       texIndexEnum,
+		index:       texIndex,
 		source:      source,
 	}
-	texIndexEnum++
 	gl.GenTextures(1, &at.id)
 	gl.BindTexture(gl.TEXTURE_2D, at.id)
 
@@ -114,6 +125,14 @@ func newAudioTexture(uniformName string, source audioSource) (*audioTexture, err
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
 	return at, nil
+}
+
+func (at *audioTexture) UniformSource() string {
+	return fmt.Sprintf(`
+		uniform sampler2D %s;
+		uniform vec3 %sSize;
+		uniform float %sCurTime;
+	`, at.uniformName, at.uniformName, at.uniformName)
 }
 
 func (at *audioTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {

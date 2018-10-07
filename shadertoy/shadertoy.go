@@ -2,18 +2,14 @@ package shadertoy
 
 import (
 	"fmt"
-	"image"
 	_ "image/jpeg"
 	_ "image/png"
-	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 
 	"github.com/polyfloyd/shady"
-	"github.com/polyfloyd/shady/shadertoy/kinect"
 )
 
 func init() {
@@ -39,6 +35,15 @@ var (
 
 var texIndexEnum uint32
 
+// A resource builder function a resource from instantiates a mapping
+// definition that can offer additional functionality to the renderer.
+//
+// The map key is the Namespace of the mapping.
+//
+// The functions are called with the mapping that should be instantiated, the
+// current working directory and an enumerator for texture IDs.
+var resourceBuilders = map[string]func(Mapping, string, *uint32) (resource, error){}
+
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
 type ShaderToy struct {
@@ -53,15 +58,6 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 	ss := make([]glsl.Source, 0, len(st.ShaderSources))
 	for _, s := range st.ShaderSources {
 		ss = append(ss, s)
-	}
-	mappings, err := extractMappings(ss)
-	if err != nil {
-		return nil, err
-	}
-
-	mappedUniforms := make([]string, 0, len(mappings))
-	for _, mapping := range mappings {
-		mappedUniforms = append(mappedUniforms, mapping.uniformSource())
 	}
 
 	return map[glsl.Stage][]glsl.Source{
@@ -86,7 +82,9 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 				uniform float iSampleRate;
 				uniform vec3 iChannelResolution[4];
 			`))
-			ss = append(ss, glsl.SourceBuf(strings.Join(mappedUniforms, "\n")))
+			for _, res := range st.resources {
+				ss = append(ss, glsl.SourceBuf(res.UniformSource()))
+			}
 			for _, s := range st.ShaderSources {
 				ss = append(ss, s)
 			}
@@ -152,6 +150,7 @@ func (st ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.Rende
 }
 
 type resource interface {
+	UniformSource() string
 	PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState)
 }
 
@@ -211,83 +210,10 @@ func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	return outMappings
 }
 
-func (m Mapping) uniformSource() string {
-	if m.Namespace == "builtin" {
-		switch m.Value {
-		case "RGBA Noise Small", "RGBA Noise Medium":
-			return fmt.Sprintf(`
-				uniform sampler2D %s;
-				uniform vec3 %sSize;
-			`, m.Name, m.Name)
-		default:
-			return "\n"
-		}
-	}
-	switch m.Namespace {
-	case "image":
-		return fmt.Sprintf(`
-			uniform sampler2D %s;
-			uniform vec3 %sSize;
-		`, m.Name, m.Name)
-	case "audio", "video", "kinect":
-		return fmt.Sprintf(`
-			uniform sampler2D %s;
-			uniform vec3 %sSize;
-			uniform float %sCurTime;
-		`, m.Name, m.Name, m.Name)
-	case "perip_mat4":
-		return fmt.Sprintf("uniform mat4 %s;", m.Name)
-	default:
-		return "\n"
-	}
-}
-
 func (m Mapping) resource(pwd string) (resource, error) {
-	if m.Namespace == "builtin" {
-		switch m.Value {
-		case "RGBA Noise Small": // 64x64 4channels uint8
-			return newImageTexture(noise(image.Rect(0, 0, 64, 64)), m.Name)
-		case "RGBA Noise Medium": // 256x256 4channels uint8
-			return newImageTexture(noise(image.Rect(0, 0, 256, 256)), m.Name)
-		default:
-			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
-		}
-	}
-	switch m.Namespace {
-	case "audio":
-		source, err := parseMappingValue(pwd, m.Value)
-		if err != nil {
-			return nil, err
-		}
-		return newAudioTexture(m.Name, source)
-
-	case "image":
-		fd, err := os.Open(resolvePath(pwd, m.Value))
-		if err != nil {
-			return nil, err
-		}
-		defer fd.Close()
-		img, _, err := image.Decode(fd)
-		if err != nil {
-			return nil, err
-		}
-		return newImageTexture(img, m.Name)
-
-	case "video":
-		return newVideoTexture(m.Name, resolvePath(pwd, m.Value))
-
-	case "perip_mat4":
-		return newMat4Peripheral(m.Name, pwd, m.Value)
-
-	case "kinect":
-		kin, err := kinect.Open(m.Name, texIndexEnum)
-		if err != nil {
-			return nil, err
-		}
-		texIndexEnum++
-		return kin, nil
-
-	default:
+	fn, ok := resourceBuilders[m.Namespace]
+	if !ok {
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
 	}
+	return fn(m, pwd, &texIndexEnum)
 }

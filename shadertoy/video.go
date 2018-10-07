@@ -14,6 +14,14 @@ import (
 	"github.com/polyfloyd/shady"
 )
 
+func init() {
+	resourceBuilders["video"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+		r, err := newVideoTexture(m.Name, resolvePath(pwd, m.Value), *texIndexEnum)
+		*texIndexEnum++
+		return r, err
+	}
+}
+
 type videoTexture struct {
 	uniformName string
 	id          uint32
@@ -25,7 +33,7 @@ type videoTexture struct {
 	currentVideoFrame int
 }
 
-func newVideoTexture(uniformName, filename string) (*videoTexture, error) {
+func newVideoTexture(uniformName, filename string, texIndex uint32) (*videoTexture, error) {
 	resolution, interval, stream, err := decodeVideoFile(filename)
 	if err != nil {
 		return nil, err
@@ -33,13 +41,12 @@ func newVideoTexture(uniformName, filename string) (*videoTexture, error) {
 
 	vt := &videoTexture{
 		uniformName: uniformName,
-		index:       texIndexEnum,
+		index:       texIndex,
 
 		resolution:    resolution,
 		frameInterval: interval,
 		stream:        stream,
 	}
-	texIndexEnum++
 	gl.GenTextures(1, &vt.id)
 	gl.BindTexture(gl.TEXTURE_2D, vt.id)
 
@@ -60,6 +67,14 @@ func newVideoTexture(uniformName, filename string) (*videoTexture, error) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
 	return vt, nil
+}
+
+func (vt *videoTexture) UniformSource() string {
+	return fmt.Sprintf(`
+		uniform sampler2D %s;
+		uniform vec3 %sSize;
+		uniform float %sCurTime;
+	`, vt.uniformName, vt.uniformName, vt.uniformName)
 }
 
 func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {

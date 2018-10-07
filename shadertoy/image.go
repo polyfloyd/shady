@@ -13,6 +13,37 @@ import (
 	"github.com/polyfloyd/shady"
 )
 
+func init() {
+	resourceBuilders["builtin"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+		switch m.Value {
+		case "RGBA Noise Small": // 64x64 4channels uint8
+			r, err := newImageTexture(noise(image.Rect(0, 0, 64, 64)), m.Name, *texIndexEnum)
+			*texIndexEnum++
+			return r, err
+		case "RGBA Noise Medium": // 256x256 4channels uint8
+			r, err := newImageTexture(noise(image.Rect(0, 0, 256, 256)), m.Name, *texIndexEnum)
+			*texIndexEnum++
+			return r, err
+		default:
+			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
+		}
+	}
+	resourceBuilders["image"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+		fd, err := os.Open(resolvePath(pwd, m.Value))
+		if err != nil {
+			return nil, err
+		}
+		defer fd.Close()
+		img, _, err := image.Decode(fd)
+		if err != nil {
+			return nil, err
+		}
+		r, err := newImageTexture(img, m.Name, *texIndexEnum)
+		*texIndexEnum++
+		return r, err
+	}
+}
+
 // imageTexture is a mapping of a static image texture.
 type imageTexture struct {
 	uniformName string
@@ -21,13 +52,12 @@ type imageTexture struct {
 	rect        image.Rectangle
 }
 
-func newImageTexture(img image.Image, uniformName string) (*imageTexture, error) {
+func newImageTexture(img image.Image, uniformName string, texIndex uint32) (*imageTexture, error) {
 	tex := &imageTexture{
 		uniformName: uniformName,
-		index:       texIndexEnum,
+		index:       texIndex,
 		rect:        img.Bounds(),
 	}
-	texIndexEnum++
 	gl.GenTextures(1, &tex.id)
 	gl.BindTexture(gl.TEXTURE_2D, tex.id)
 
@@ -56,6 +86,13 @@ func newImageTexture(img image.Image, uniformName string) (*imageTexture, error)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
 	return tex, nil
+}
+
+func (tex *imageTexture) UniformSource() string {
+	return fmt.Sprintf(`
+		uniform sampler2D %s;
+		uniform vec3 %sSize;
+	`, tex.uniformName, tex.uniformName)
 }
 
 func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {

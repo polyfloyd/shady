@@ -15,6 +15,12 @@ import (
 	"github.com/tarm/serial"
 )
 
+func init() {
+	resourceBuilders["perip_mat4"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+		return newMat4Peripheral(m.Name, pwd, m.Value)
+	}
+}
+
 var (
 	periphFile   = regexp.MustCompile(`^([^;]+)(\??)$`)
 	periphSerial = regexp.MustCompile(`^([^;]+);(\d+)(\??)$`)
@@ -93,6 +99,10 @@ func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
 	}()
 
 	return pr, nil
+}
+
+func (pr *periphMat4) UniformSource() string {
+	return fmt.Sprintf("uniform mat4 %s;", pr.uniformName)
 }
 
 func (pr *periphMat4) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
