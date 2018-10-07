@@ -109,9 +109,9 @@ shady -i example.glsl -ofmt rgb24 -framerate 20 | ledcat --framerate 20 show
 ```
 
 ### FFmpeg
-FFmpeg may be used to visualize the output:
+FFmpeg may be used to render to video files:
 ```
-# Render at 1024x768 at 20 fps and show it
+# Render at 1024x768 at 20 fps and show it, the same as using `-ofmt x11`:
 shady -i example.glsl -ofmt rgb24 -g 1024x768 -framerate 20 \
   | ffplay -f rawvideo -pixel_format rgb24 -video_size 1024x768 -framerate 20 -
 
@@ -120,6 +120,15 @@ shady -i example.glsl -ofmt rgb24 -g 1024x768 -framerate 10 \
   | ffmpeg -f rawvideo -pixel_format rgb24 -video_size 1024x768 \
     -framerate 10 -t 12 -i - example.mp4
 ```
+
+### Kinect depth image
+If Shady was compiled using the `kinect` build tag, it is possible to use a
+Kinect's RGB and depth image in shaders. Just pass `-tags kinect` to `go build`
+when building and use `#pragma map kinect=kinect:on` to create a `sampler2D` of
+the Kinect's video stream. The alpha channel holds the depth image.
+
+Internally, libfreenect is used which only supports the earlier Kinect versions
+for the XBox 360.
 
 ### Troubleshooting
 #### My performance is really bad
