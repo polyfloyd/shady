@@ -95,13 +95,19 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 	return sh, nil
 }
 
+func (sh *Shader) drawGeometry() {
+	// Assumes sh.canvas is bound to GL_ARRAY_BUFFER and sh.program is the
+	// current shader program.
+	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+}
+
 func (sh *Shader) Image() image.Image {
 	sh.env.PreRender(sh.uniforms, RenderState{
 		Time:         0,
 		CanvasWidth:  sh.w,
 		CanvasHeight: sh.h,
 	})
-	handle := sh.renderer.Draw()
+	handle := sh.renderer.Draw(sh.drawGeometry)
 	return sh.renderer.Image(handle)
 }
 
@@ -130,7 +136,7 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 		})
 		t += interval
 
-		handle := sh.renderer.Draw()
+		handle := sh.renderer.Draw(sh.drawGeometry)
 		buffer <- handle
 		prevImageHandle = handle
 
@@ -176,7 +182,7 @@ type renderer interface {
 	Setup() error
 	NumBuffers() int
 
-	Draw() (handle interface{})
+	Draw(func()) (handle interface{})
 	Image(handle interface{}) image.Image
 
 	Texture(handle interface{}) uint32
@@ -230,12 +236,15 @@ func (pr *pboRenderer) Image(handle interface{}) image.Image {
 	return img
 }
 
-func (pr *pboRenderer) Draw() interface{} {
+// Draw instructs OpenGL to render a single image with the scene drawn by
+// function provided.
+// A handle is returned which can be used to access the image data.
+func (pr *pboRenderer) Draw(drawFunc func()) interface{} {
 	pr.curTargetIndex = (pr.curTargetIndex + 1) % len(pr.targets)
 	t := &pr.targets[pr.curTargetIndex]
 	gl.BindFramebuffer(gl.FRAMEBUFFER, t.fbo)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	drawFunc()
 	// Start the transfer of the image to the PBO.
 	gl.BindBuffer(gl.PIXEL_PACK_BUFFER, t.pbo)
 	gl.ReadPixels(0, 0, int32(pr.w), int32(pr.h), gl.RGBA, gl.UNSIGNED_BYTE, nil)
