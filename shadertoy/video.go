@@ -36,10 +36,10 @@ type videoTexture struct {
 	cancel func()
 }
 
-func newVideoTexture(uniformName, filename string, texIndex uint32, time time.Duration) (*videoTexture, error) {
+func newVideoTexture(uniformName, filename string, texIndex uint32, currentTime time.Duration) (*videoTexture, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	resolution, interval, stream, err := decodeVideoFile(ctx, filename, time)
+	resolution, interval, stream, err := decodeVideoFile(ctx, filename, currentTime)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -52,7 +52,7 @@ func newVideoTexture(uniformName, filename string, texIndex uint32, time time.Du
 		resolution:        resolution,
 		frameInterval:     interval,
 		stream:            stream,
-		currentVideoFrame: int(time / interval),
+		currentVideoFrame: int(currentTime / interval),
 
 		cancel: cancel,
 	}
@@ -145,62 +145,66 @@ func (vt *videoTexture) Close() error {
 	return nil
 }
 
-func decodeVideoFile(ctx context.Context, filename string, seekTo time.Duration) (image.Rectangle, time.Duration, <-chan interface{}, error) {
+func decodeVideoFile(ctx context.Context, filename string, currentTime time.Duration) (image.Rectangle, time.Duration, <-chan interface{}, error) {
 	info, err := ffprobe(ctx, filename)
 	if err != nil {
 		return image.Rectangle{}, 0, nil, err
 	}
-	streamIndex, err := info.FirstStreamByType("video")
+	resolution, err := info.VideoResolution()
 	if err != nil {
 		return image.Rectangle{}, 0, nil, err
 	}
-	videoInfo := &info.Streams[streamIndex]
-	resolution := image.Rect(0, 0, videoInfo.Width, videoInfo.Heigth)
-
-	s := strings.Split(videoInfo.AvgFrameRate, "/")
-	nu, _ := strconv.Atoi(s[0])
-	de, _ := strconv.Atoi(s[1])
 	interval := time.Second
-	if nu != 0 && de != 0 {
-		interval = time.Duration(float64(time.Second) / (float64(nu) / float64(de)))
+	if iv, err := info.VideoFrameInterval(); err == nil {
+		interval = iv
+	}
+	duration, err := info.Duration()
+	if err != nil {
+		return image.Rectangle{}, 0, nil, err
 	}
 
 	out := make(chan interface{}, 4)
 	go func() {
 		defer close(out)
-		cmd := exec.CommandContext(
-			ctx,
-			"ffmpeg",
-			"-i", filename,
-			"-ss", fmt.Sprintf("%.2f", seekTo.Seconds()),
-			"-f", "rawvideo",
-			"-pix_fmt", "rgb24",
-			"-",
-		)
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			out <- err
-			return
-		}
-		if err := cmd.Start(); err != nil {
-			out <- err
-			return
-		}
-
-		for {
-			imgBuf := make([]byte, resolution.Dx()*resolution.Dy()*3)
-			if _, err := io.ReadFull(stdout, imgBuf); err != nil {
-				if err != io.EOF {
-					out <- err
-				}
-				break
+		seekToOffset := currentTime % duration
+		for ctx.Err() == nil {
+			cmd := exec.CommandContext(
+				ctx,
+				"ffmpeg",
+				"-i", filename,
+				"-ss", fmt.Sprintf("%.2f", seekToOffset.Seconds()),
+				"-f", "rawvideo",
+				"-pix_fmt", "rgb24",
+				"-",
+			)
+			stdout, err := cmd.StdoutPipe()
+			if err != nil {
+				out <- err
+				return
 			}
-			out <- imgBuf
-		}
+			if err := cmd.Start(); err != nil {
+				out <- err
+				return
+			}
 
-		if err := cmd.Wait(); err != nil {
-			out <- err
-			return
+			for {
+				imgBuf := make([]byte, resolution.Dx()*resolution.Dy()*3)
+				if _, err := io.ReadFull(stdout, imgBuf); err != nil {
+					if err != io.EOF {
+						out <- err
+					}
+					break
+				}
+				out <- imgBuf
+			}
+
+			if err := cmd.Wait(); err != nil {
+				out <- err
+				return
+			}
+
+			// Restart the next playback at the beginning.
+			seekToOffset = 0
 		}
 	}()
 	return resolution, interval, out, nil
@@ -213,6 +217,9 @@ type mediaInfo struct {
 		Width        int    `json:"width"`
 		Heigth       int    `json:"height"`
 	} `json:"streams"`
+	Format struct {
+		Duration string `json:"duration"`
+	} `json:"format"`
 }
 
 func ffprobe(ctx context.Context, filename string) (*mediaInfo, error) {
@@ -241,11 +248,51 @@ func ffprobe(ctx context.Context, filename string) (*mediaInfo, error) {
 	return &data, nil
 }
 
-func (inf *mediaInfo) FirstStreamByType(typ string) (int, error) {
-	for i, stream := range inf.Streams {
+func (info *mediaInfo) firstStreamByType(typ string) (int, error) {
+	for i, stream := range info.Streams {
 		if stream.CodecType == typ {
 			return i, nil
 		}
 	}
 	return -1, fmt.Errorf("no stream with type %q found", typ)
+}
+
+func (info *mediaInfo) Duration() (time.Duration, error) {
+	f, err := strconv.ParseFloat(info.Format.Duration, 64)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse video duration: %v", err)
+	}
+	return time.Duration(f * float64(time.Second)), nil
+}
+
+func (info *mediaInfo) VideoFrameInterval() (time.Duration, error) {
+	streamIndex, err := info.firstStreamByType("video")
+	if err != nil {
+		return -1, err
+	}
+	videoInfo := &info.Streams[streamIndex]
+
+	s := strings.Split(videoInfo.AvgFrameRate, "/")
+	nu, err := strconv.Atoi(s[0])
+	if err != nil {
+		return -1, fmt.Errorf("could not determine video frame interval: %v", err)
+	}
+	de, err := strconv.Atoi(s[1])
+	if err != nil {
+		return -1, fmt.Errorf("could not determine video frame interval: %v", err)
+	}
+
+	if nu == 0 || de == 0 {
+		return -1, fmt.Errorf("could not determine video frame interval")
+	}
+	return time.Duration(float64(time.Second) / (float64(nu) / float64(de))), nil
+}
+
+func (info *mediaInfo) VideoResolution() (image.Rectangle, error) {
+	streamIndex, err := info.firstStreamByType("video")
+	if err != nil {
+		return image.Rectangle{}, err
+	}
+	videoInfo := &info.Streams[streamIndex]
+	return image.Rect(0, 0, videoInfo.Width, videoInfo.Heigth), nil
 }
