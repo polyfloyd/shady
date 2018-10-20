@@ -118,6 +118,11 @@ func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.
 	}
 }
 
+func (tex *imageTexture) Close() error {
+	gl.DeleteTextures(1, &tex.id)
+	return nil
+}
+
 func noise(rect image.Rectangle) image.Image {
 	img := image.NewRGBA(rect)
 	rng := rand.New(rand.NewSource(1337))
@@ -152,6 +157,8 @@ func (tex *backBufferImage) PreRender(uniforms map[string]glsl.Uniform, state gl
 		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 1.0)
 	}
 }
+
+func (tex *backBufferImage) Close() error { return nil }
 
 func resolvePath(pwd, path string) string {
 	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {

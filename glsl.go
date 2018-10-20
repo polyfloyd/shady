@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"log"
 	"os"
 	"time"
 
@@ -21,28 +22,25 @@ type Shader struct {
 	canvas  uint32
 
 	uniforms map[string]Uniform
-	env      Environment
 	renderer renderer
 	program  uint32
+
+	env     Environment
+	newEnvs chan Environment
+
+	time  time.Duration
+	frame uint64
 }
 
-func NewShader(width, height uint, env Environment) (*Shader, error) {
+func NewShader(width, height uint) (*Shader, error) {
 	display, err := egl.GetDisplay(egl.DefaultDisplay)
 	if err != nil {
 		return nil, err
 	}
 	surface := display.CreateSurface(width, height)
 	display.BindAPI(egl.OpenGLAPI)
-	context := display.CreateContext(surface)
-	context.MakeCurrent()
-
-	sh := &Shader{
-		display:  display,
-		w:        width,
-		h:        height,
-		env:      env,
-		renderer: &pboRenderer{w: width, h: height},
-	}
+	glContext := display.CreateContext(surface)
+	glContext.MakeCurrent()
 
 	// Initialize OpenGL
 	if err := gl.Init(); err != nil {
@@ -57,6 +55,14 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 			}
 		}
 	}()
+
+	sh := &Shader{
+		display:  display,
+		w:        width,
+		h:        height,
+		renderer: &pboRenderer{w: width, h: height},
+		newEnvs:  make(chan Environment, 1),
+	}
 
 	// Set up the render targets.
 	if err := sh.renderer.Setup(); err != nil {
@@ -74,25 +80,66 @@ func NewShader(width, height uint, env Environment) (*Shader, error) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, sh.canvas)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
 
-	if err := env.Setup(); err != nil {
-		return nil, fmt.Errorf("error setting up environment: %v", err)
+	return sh, nil
+}
+
+// reloadEnvironment ensures that an environment is set and set up for
+// rendering.
+func (sh *Shader) reloadEnvironment(ctx context.Context) error {
+	var env Environment
+	if sh.env == nil {
+		// If no environment is set, block until it is set or the context is
+		// canceled.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case env = <-sh.newEnvs:
+		}
+	} else {
+		// If an environment is already set, check if a newer environment is
+		// available or just exit.
+		select {
+		case env = <-sh.newEnvs:
+		default:
+			return nil
+		}
 	}
 
-	// Set up the shader.
+	// Close the old environment if there is one.
+	if sh.env != nil {
+		sh.env.Close()
+		gl.DeleteProgram(sh.program)
+		sh.env = nil
+	}
+	if env == nil {
+		return nil
+	}
+
+	if err := env.Setup(); err != nil {
+		return fmt.Errorf("error setting up environment: %v", err)
+	}
+
 	sources, err := env.Sources()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	sh.program, err = linkProgram(sources)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	gl.UseProgram(sh.program)
+	sh.uniforms = ListUniforms(sh.program)
+
 	sh.vertLoc = uint32(gl.GetAttribLocation(sh.program, gl.Str("vert\x00")))
 	gl.EnableVertexAttribArray(sh.vertLoc)
 	gl.VertexAttribPointer(sh.vertLoc, 3, gl.FLOAT, false, 0, nil)
-	sh.uniforms = ListUniforms(sh.program)
-	return sh, nil
+
+	sh.env = env
+	return nil
+}
+
+func (sh *Shader) SetEnvironment(env Environment) {
+	sh.newEnvs <- env
 }
 
 func (sh *Shader) drawGeometry() {
@@ -102,6 +149,11 @@ func (sh *Shader) drawGeometry() {
 }
 
 func (sh *Shader) Image() image.Image {
+	if err := sh.reloadEnvironment(context.Background()); err != nil {
+		log.Println(err)
+		return nil
+	}
+
 	sh.env.PreRender(sh.uniforms, RenderState{
 		Time:         0,
 		CanvasWidth:  sh.w,
@@ -112,10 +164,14 @@ func (sh *Shader) Image() image.Image {
 }
 
 func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream chan<- image.Image) {
-	var t time.Duration
 	var prevImageHandle interface{}
 	buffer := make(chan interface{}, sh.renderer.NumBuffers())
-	for frame := uint64(0); ; frame++ {
+	for {
+		if err := sh.reloadEnvironment(ctx); err != nil {
+			log.Println(err)
+			continue
+		}
+
 		var prevTexID uint32
 		getPrevTexID := func() uint32 { return 0 }
 		if prevImageHandle != nil {
@@ -127,14 +183,15 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 			}
 		}
 		sh.env.PreRender(sh.uniforms, RenderState{
-			Time:               t,
+			Time:               sh.time,
 			Interval:           interval,
-			FramesProcessed:    frame,
+			FramesProcessed:    sh.frame,
 			CanvasWidth:        sh.w,
 			CanvasHeight:       sh.h,
 			PreviousFrameTexID: getPrevTexID,
 		})
-		t += interval
+		sh.time += interval
+		sh.frame++
 
 		handle := sh.renderer.Draw(sh.drawGeometry)
 		buffer <- handle
@@ -158,13 +215,14 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 }
 
 func (sh *Shader) Close() error {
+	envErr := sh.env.Close()
 	gl.DeleteProgram(sh.program)
 	gl.DeleteBuffers(1, &sh.canvas)
 	defer sh.display.Destroy()
 	if err := sh.renderer.Close(); err != nil {
 		return err
 	}
-	return nil
+	return envErr
 }
 
 // Flip wraps an image and flips it upside down.

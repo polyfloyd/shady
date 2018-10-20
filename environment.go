@@ -44,6 +44,10 @@ type Environment interface {
 	// sinceStart is the animation time elapsed since the first frame was
 	// rendered.
 	PreRender(uniforms map[string]Uniform, state RenderState)
+
+	// Close should shut down the environment by freeing all associated
+	// (OpenGL) resources.
+	Close() error
 }
 
 type RenderState struct {

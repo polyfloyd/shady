@@ -191,6 +191,11 @@ func (at *audioTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 	}
 }
 
+func (at *audioTexture) Close() error {
+	gl.DeleteTextures(1, &at.id)
+	return nil
+}
+
 type audioSource interface {
 	SampleRate() float32
 
@@ -231,6 +236,7 @@ func (s *rawSource) ReadSamples(period time.Duration) []float64 {
 }
 
 func decodeAudioFile(filename string) (channels, samplerate int, ft format, stream io.Reader, err error) {
+	// TODO: Close ffmpeg
 	r, w := io.Pipe()
 	go func() {
 		cmd := exec.Command(

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/polyfloyd/shady"
@@ -27,9 +28,10 @@ var (
 )
 
 type periphMat4 struct {
-	uniformName      string
-	currentValue     [16]float32
-	currentValueLock sync.Mutex
+	uniformName        string
+	currentValue       [16]float32
+	currentValueLock   sync.Mutex
+	closed, loopClosed chan struct{}
 }
 
 func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
@@ -49,8 +51,9 @@ func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
 		baudrate, _ := strconv.Atoi(match[2])
 		var ser *serial.Port
 		ser, err = serial.OpenPort(&serial.Config{
-			Name: match[1],
-			Baud: baudrate,
+			Name:        match[1],
+			Baud:        baudrate,
+			ReadTimeout: time.Second * 10,
 		})
 		if err == nil {
 			reader = ser
@@ -75,10 +78,19 @@ func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
 		return pr, nil
 	}
 
+	pr.closed = make(chan struct{})
+	pr.loopClosed = make(chan struct{})
 	go func() {
 		defer reader.Close()
+		defer close(pr.loopClosed)
 		br := bufio.NewReader(reader)
 		for {
+			select {
+			case <-pr.closed:
+				break
+			default:
+			}
+
 			line, err := br.ReadBytes('\n')
 			if err != nil {
 				break
@@ -111,4 +123,13 @@ func (pr *periphMat4) PreRender(uniforms map[string]glsl.Uniform, state glsl.Ren
 		gl.UniformMatrix4fv(loc.Location, 1, false, &pr.currentValue[0])
 		pr.currentValueLock.Unlock()
 	}
+}
+
+func (pr *periphMat4) Close() error {
+	if pr.closed == nil {
+		return nil
+	}
+	close(pr.closed)
+	<-pr.loopClosed
+	return nil
 }

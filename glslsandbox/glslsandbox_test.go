@@ -41,11 +41,12 @@ func TestOutputSize(t *testing.T) {
 	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h, env)
+	shader, err := glsl.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer shader.Close()
+	shader.SetEnvironment(env)
 
 	img := shader.Image()
 	if iw := img.Bounds().Dx(); iw != w {
@@ -78,11 +79,12 @@ func TestColorOrdering(t *testing.T) {
 	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h, env)
+	shader, err := glsl.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer shader.Close()
+	shader.SetEnvironment(env)
 
 	img := shader.Image()
 	if iw := img.Bounds().Dx(); iw != w {
@@ -129,11 +131,12 @@ func TestAnimationTime(t *testing.T) {
 	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h, env)
+	shader, err := glsl.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer shader.Close()
+	shader.SetEnvironment(env)
 
 	images := make([]image.Image, 0, 4)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -186,11 +189,12 @@ func TestAnimationBackbuffer(t *testing.T) {
 	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h, env)
+	shader, err := glsl.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer shader.Close()
+	shader.SetEnvironment(env)
 
 	images := make([]image.Image, 0, 4)
 	ctx, cancel := context.WithCancel(context.Background())

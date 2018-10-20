@@ -27,27 +27,6 @@ var sources = map[string]glsl.Source{
 	"wave":  shaderWave,
 }
 
-func BenchmarkCompile(b *testing.B) {
-	if os.Getenv("DISPLAY") == "" {
-		b.SkipNow()
-	}
-
-	for name, source := range sources {
-		env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
-		b.Run(name, func(b *testing.B) {
-			runtime.LockOSThread()
-
-			for n := 0; n < b.N; n++ {
-				shader, err := glsl.NewShader(512, 512, env)
-				if err != nil {
-					b.Fatal(err)
-				}
-				shader.Close()
-			}
-		})
-	}
-}
-
 func BenchmarkRenderImage(b *testing.B) {
 	if os.Getenv("DISPLAY") == "" {
 		b.SkipNow()
@@ -58,11 +37,12 @@ func BenchmarkRenderImage(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
-			shader, err := glsl.NewShader(512, 512, env)
+			shader, err := glsl.NewShader(512, 512)
 			if err != nil {
 				b.Fatal(err)
 			}
 			defer shader.Close()
+			shader.SetEnvironment(env)
 
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
@@ -82,11 +62,12 @@ func BenchmarkRenderAnimation(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
-			shader, err := glsl.NewShader(512, 512, env)
+			shader, err := glsl.NewShader(512, 512)
 			if err != nil {
 				b.Fatal(err)
 			}
 			defer shader.Close()
+			shader.SetEnvironment(env)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			stream := make(chan image.Image)

@@ -62,3 +62,5 @@ func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.Render
 		gl.Uniform1i(loc.Location, 0)
 	}
 }
+
+func (GLSLSandbox) Close() error { return nil }

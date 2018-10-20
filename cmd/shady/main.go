@@ -111,7 +111,7 @@ func main() {
 	in := make(chan image.Image, 10)
 	out := (<-chan image.Image)(in)
 	if animateNumFrames > 0 {
-		out = limitNumFramesl(out, animateNumFrames)
+		out = limitNumFrames(out, animateNumFrames)
 	}
 	if *realtime {
 		out = limitFramerate(out, interval)
@@ -126,10 +126,16 @@ func main() {
 		cancel()
 	}()
 
+	sh, err := glsl.NewShader(width, height)
+	if err != nil {
+		log.Fatalf("Could initialize OpenGL: %v", err)
+	}
+	defer sh.Close()
+
 	for ctx.Err() == nil {
 		loopCtx, loopCancel := context.WithCancel(ctx)
 
-		sh, watcher, err := func() (*glsl.Shader, *fsnotify.Watcher, error) {
+		env, watcher, err := func() (glsl.Environment, *fsnotify.Watcher, error) {
 			watcher, err := fsnotify.NewWatcher()
 			if err != nil {
 				return nil, nil, err
@@ -186,16 +192,10 @@ func main() {
 				return nil, watcher, fmt.Errorf("Unknown environment: %q", *envName)
 			}
 
-			// Compile the shader.
-			sh, err := glsl.NewShader(width, height, env)
-			if err != nil {
-				return nil, watcher, err
-			}
-			return sh, watcher, nil
+			return env, watcher, nil
 		}()
 		if err != nil {
 			log.Println(err)
-			_ = watch
 			if !*watch {
 				watcher.Close()
 				loopCancel()
@@ -213,6 +213,9 @@ func main() {
 			loopCancel()
 			continue
 		}
+
+		// Load the new environment.
+		sh.SetEnvironment(env)
 
 		if *watch {
 			go func() {
@@ -237,12 +240,11 @@ func main() {
 
 		sh.Animate(loopCtx, interval, in)
 		watcher.Close()
-		sh.Close()
 		loopCancel()
 	}
 }
 
-func limitNumFramesl(in <-chan image.Image, desiredTotalNumFrames uint) <-chan image.Image {
+func limitNumFrames(in <-chan image.Image, desiredTotalNumFrames uint) <-chan image.Image {
 	out := make(chan image.Image)
 	go func() {
 		defer close(out)

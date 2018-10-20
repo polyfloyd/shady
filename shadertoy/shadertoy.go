@@ -5,6 +5,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -149,9 +150,23 @@ func (st ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.Rende
 	}
 }
 
+func (st *ShaderToy) Close() error {
+	var errors []string
+	for _, res := range st.resources {
+		if err := res.Close(); err != nil {
+			errors = append(errors, err.Error())
+		}
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("error shutting down ShaderToy resource(s): {%s}", strings.Join(errors, ", "))
+	}
+	return nil
+}
+
 type resource interface {
 	UniformSource() string
 	PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState)
+	Close() error
 }
 
 // A Mapping is a parsed representation of a "map <name>=<namespace>:<value>"

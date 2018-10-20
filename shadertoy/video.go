@@ -1,6 +1,7 @@
 package shadertoy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -31,11 +32,16 @@ type videoTexture struct {
 	frameInterval     time.Duration
 	stream            <-chan interface{}
 	currentVideoFrame int
+
+	cancel func()
 }
 
 func newVideoTexture(uniformName, filename string, texIndex uint32) (*videoTexture, error) {
-	resolution, interval, stream, err := decodeVideoFile(filename)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	resolution, interval, stream, err := decodeVideoFile(ctx, filename)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -46,6 +52,8 @@ func newVideoTexture(uniformName, filename string, texIndex uint32) (*videoTextu
 		resolution:    resolution,
 		frameInterval: interval,
 		stream:        stream,
+
+		cancel: cancel,
 	}
 	gl.GenTextures(1, &vt.id)
 	gl.BindTexture(gl.TEXTURE_2D, vt.id)
@@ -130,8 +138,14 @@ func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 	}
 }
 
-func decodeVideoFile(filename string) (image.Rectangle, time.Duration, <-chan interface{}, error) {
-	info, err := ffprobe(filename)
+func (vt *videoTexture) Close() error {
+	vt.cancel()
+	gl.DeleteTextures(1, &vt.id)
+	return nil
+}
+
+func decodeVideoFile(ctx context.Context, filename string) (image.Rectangle, time.Duration, <-chan interface{}, error) {
+	info, err := ffprobe(ctx, filename)
 	if err != nil {
 		return image.Rectangle{}, 0, nil, err
 	}
@@ -153,7 +167,8 @@ func decodeVideoFile(filename string) (image.Rectangle, time.Duration, <-chan in
 	out := make(chan interface{}, 4)
 	go func() {
 		defer close(out)
-		cmd := exec.Command(
+		cmd := exec.CommandContext(
+			ctx,
 			"ffmpeg",
 			"-i", filename,
 			"-f", "rawvideo",
@@ -198,8 +213,9 @@ type mediaInfo struct {
 	} `json:"streams"`
 }
 
-func ffprobe(filename string) (*mediaInfo, error) {
-	cmd := exec.Command(
+func ffprobe(ctx context.Context, filename string) (*mediaInfo, error) {
+	cmd := exec.CommandContext(
+		ctx,
 		"ffprobe", filename,
 		"-print_format", "json",
 		"-show_format", "-show_streams",

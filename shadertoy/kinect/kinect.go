@@ -129,6 +129,7 @@ func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 func (kin *Kinect) Close() error {
 	close(kin.closed)
 	<-kin.loopClosed
+	gl.DeleteTextures(1, &kin.textureID)
 	return nil
 }
 
@@ -179,6 +180,8 @@ func (kin *Kinect) PreRender(uniforms map[string]glsl.Uniform, state glsl.Render
 }
 
 func (kin *Kinect) freenectLoop() {
+	defer close(kin.loopClosed)
+
 	tiltAngle := 15.
 
 	C.freenect_set_tilt_degs(kin.dev, C.double(tiltAngle))
@@ -207,8 +210,6 @@ outer:
 	C.freenect_stop_video(kin.dev)
 	C.freenect_close_device(kin.dev)
 	C.freenect_shutdown(kin.ctx)
-
-	close(kin.loopClosed)
 }
 
 func (kin *Kinect) rgbCallback(rgbPtr uintptr) {
