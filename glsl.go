@@ -115,7 +115,14 @@ func (sh *Shader) reloadEnvironment(ctx context.Context) error {
 		return nil
 	}
 
-	if err := env.Setup(); err != nil {
+	renderState := RenderState{
+		Time:            sh.time,
+		FramesProcessed: sh.frame,
+		CanvasWidth:     sh.w,
+		CanvasHeight:    sh.h,
+		Uniforms:        sh.uniforms,
+	}
+	if err := env.Setup(renderState); err != nil {
 		return fmt.Errorf("error setting up environment: %v", err)
 	}
 

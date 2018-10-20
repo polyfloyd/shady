@@ -17,7 +17,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["perip_mat4"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+	resourceBuilders["perip_mat4"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
 		return newMat4Peripheral(m.Name, pwd, m.Value)
 	}
 }

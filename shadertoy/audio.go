@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["audio"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+	resourceBuilders["audio"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
 		source, err := parseMappingValue(pwd, m.Value)
 		if err != nil {
 			return nil, err

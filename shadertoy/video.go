@@ -16,8 +16,8 @@ import (
 )
 
 func init() {
-	resourceBuilders["video"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
-		r, err := newVideoTexture(m.Name, resolvePath(pwd, m.Value), *texIndexEnum)
+	resourceBuilders["video"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
+		r, err := newVideoTexture(m.Name, resolvePath(pwd, m.Value), *texIndexEnum, state.Time)
 		*texIndexEnum++
 		return r, err
 	}
@@ -36,10 +36,10 @@ type videoTexture struct {
 	cancel func()
 }
 
-func newVideoTexture(uniformName, filename string, texIndex uint32) (*videoTexture, error) {
+func newVideoTexture(uniformName, filename string, texIndex uint32, time time.Duration) (*videoTexture, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	resolution, interval, stream, err := decodeVideoFile(ctx, filename)
+	resolution, interval, stream, err := decodeVideoFile(ctx, filename, time)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -49,9 +49,10 @@ func newVideoTexture(uniformName, filename string, texIndex uint32) (*videoTextu
 		uniformName: uniformName,
 		index:       texIndex,
 
-		resolution:    resolution,
-		frameInterval: interval,
-		stream:        stream,
+		resolution:        resolution,
+		frameInterval:     interval,
+		stream:            stream,
+		currentVideoFrame: int(time / interval),
 
 		cancel: cancel,
 	}
@@ -144,7 +145,7 @@ func (vt *videoTexture) Close() error {
 	return nil
 }
 
-func decodeVideoFile(ctx context.Context, filename string) (image.Rectangle, time.Duration, <-chan interface{}, error) {
+func decodeVideoFile(ctx context.Context, filename string, seekTo time.Duration) (image.Rectangle, time.Duration, <-chan interface{}, error) {
 	info, err := ffprobe(ctx, filename)
 	if err != nil {
 		return image.Rectangle{}, 0, nil, err
@@ -171,6 +172,7 @@ func decodeVideoFile(ctx context.Context, filename string) (image.Rectangle, tim
 			ctx,
 			"ffmpeg",
 			"-i", filename,
+			"-ss", fmt.Sprintf("%.2f", seekTo.Seconds()),
 			"-f", "rawvideo",
 			"-pix_fmt", "rgb24",
 			"-",

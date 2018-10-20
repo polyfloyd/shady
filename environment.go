@@ -37,7 +37,7 @@ type Environment interface {
 
 	// Setup may be used to initialize any OpenGL state before the first frame
 	// is rendered.
-	Setup() error
+	Setup(state RenderState) error
 
 	// PreRender updates the program's uniform values for each next frame.
 	//

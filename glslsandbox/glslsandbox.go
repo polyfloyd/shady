@@ -41,7 +41,7 @@ func (gs GLSLSandbox) Sources() (map[glsl.Stage][]glsl.Source, error) {
 	}, nil
 }
 
-func (GLSLSandbox) Setup() error { return nil }
+func (GLSLSandbox) Setup(glsl.RenderState) error { return nil }
 
 func (GLSLSandbox) PreRender(state glsl.RenderState) {
 	if loc, ok := state.Uniforms["resolution"]; ok {

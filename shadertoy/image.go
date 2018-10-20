@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["builtin"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+	resourceBuilders["builtin"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
 		switch m.Value {
 		case "Back Buffer":
 			r := &backBufferImage{
@@ -35,7 +35,7 @@ func init() {
 			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
 		}
 	}
-	resourceBuilders["image"] = func(m Mapping, pwd string, texIndexEnum *uint32) (resource, error) {
+	resourceBuilders["image"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
 		fd, err := os.Open(resolvePath(pwd, m.Value))
 		if err != nil {
 			return nil, err

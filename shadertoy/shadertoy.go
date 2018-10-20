@@ -43,7 +43,7 @@ var texIndexEnum uint32
 //
 // The functions are called with the mapping that should be instantiated, the
 // current working directory and an enumerator for texture IDs.
-var resourceBuilders = map[string]func(Mapping, string, *uint32) (resource, error){}
+var resourceBuilders = map[string]func(Mapping, string, *uint32, glsl.RenderState) (resource, error){}
 
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
@@ -99,7 +99,7 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 	}, nil
 }
 
-func (st *ShaderToy) Setup() error {
+func (st *ShaderToy) Setup(state glsl.RenderState) error {
 	ss := make([]glsl.Source, 0, len(st.ShaderSources))
 	for _, s := range st.ShaderSources {
 		ss = append(ss, s)
@@ -110,7 +110,7 @@ func (st *ShaderToy) Setup() error {
 	}
 
 	for _, mapping := range mappings {
-		res, err := mapping.resource(st.ResolveDir)
+		res, err := mapping.resource(st.ResolveDir, state)
 		if err != nil {
 			return err
 		}
@@ -225,10 +225,10 @@ func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	return outMappings
 }
 
-func (m Mapping) resource(pwd string) (resource, error) {
+func (m Mapping) resource(pwd string, state glsl.RenderState) (resource, error) {
 	fn, ok := resourceBuilders[m.Namespace]
 	if !ok {
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
 	}
-	return fn(m, pwd, &texIndexEnum)
+	return fn(m, pwd, &texIndexEnum, state)
 }
