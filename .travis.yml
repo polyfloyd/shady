@@ -16,7 +16,7 @@ before_script:
   - dep ensure
 script:
   - gofmt -s -d .
-  - go build ./cmd/shady/
+  - go build -tags kinect ./cmd/shady/
   - go test -test.v -race ./...
   - go vet ./...
   - golint -min_confidence 0.3 $(go list ./...)
