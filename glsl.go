@@ -154,10 +154,11 @@ func (sh *Shader) Image() image.Image {
 		return nil
 	}
 
-	sh.env.PreRender(sh.uniforms, RenderState{
+	sh.env.PreRender(RenderState{
 		Time:         0,
 		CanvasWidth:  sh.w,
 		CanvasHeight: sh.h,
+		Uniforms:     sh.uniforms,
 	})
 	handle := sh.renderer.Draw(sh.drawGeometry)
 	return sh.renderer.Image(handle)
@@ -182,12 +183,13 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 				return prevTexID
 			}
 		}
-		sh.env.PreRender(sh.uniforms, RenderState{
+		sh.env.PreRender(RenderState{
 			Time:               sh.time,
 			Interval:           interval,
 			FramesProcessed:    sh.frame,
 			CanvasWidth:        sh.w,
 			CanvasHeight:       sh.h,
+			Uniforms:           sh.uniforms,
 			PreviousFrameTexID: getPrevTexID,
 		})
 		sh.time += interval

@@ -85,7 +85,7 @@ func (vt *videoTexture) UniformSource() string {
 	`, vt.uniformName, vt.uniformName, vt.uniformName)
 }
 
-func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
+func (vt *videoTexture) PreRender(state glsl.RenderState) {
 	nextFrameTime := time.Duration(vt.currentVideoFrame+1) * vt.frameInterval
 	if state.Time < nextFrameTime {
 		return
@@ -104,7 +104,7 @@ func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 		panic(fmt.Sprintf("unreachable (%#v)", val))
 	}
 
-	if loc, ok := uniforms[vt.uniformName]; ok {
+	if loc, ok := state.Uniforms[vt.uniformName]; ok {
 		gl.ActiveTexture(gl.TEXTURE0 + vt.index)
 		gl.BindTexture(gl.TEXTURE_2D, vt.id)
 		gl.TexSubImage2D(
@@ -121,19 +121,19 @@ func (vt *videoTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 		gl.Uniform1i(loc.Location, int32(vt.index))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
-		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(vt.resolution.Dx()), float32(vt.resolution.Dy()), 1.0)
 		}
 	}
-	if loc, ok := uniforms[fmt.Sprintf("%sSize", vt.uniformName)]; ok {
+	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", vt.uniformName)]; ok {
 		gl.Uniform3f(loc.Location, float32(vt.resolution.Dx()), float32(vt.resolution.Dy()), 1.0)
 	}
 	if m := ichannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
-		if loc, ok := uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
+		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
 			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 		}
 	}
-	if loc, ok := uniforms[fmt.Sprintf("%sCurTime", vt.uniformName)]; ok {
+	if loc, ok := state.Uniforms[fmt.Sprintf("%sCurTime", vt.uniformName)]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
 }

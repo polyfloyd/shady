@@ -135,7 +135,7 @@ func (at *audioTexture) UniformSource() string {
 	`, at.uniformName, at.uniformName, at.uniformName)
 }
 
-func (at *audioTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
+func (at *audioTexture) PreRender(state glsl.RenderState) {
 	period := at.source.ReadSamples(state.Interval)
 	if len(period) < audioTexWidth {
 		period = make([]float64, audioTexWidth)
@@ -143,7 +143,7 @@ func (at *audioTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 		period = period[len(period)-audioTexWidth:]
 	}
 
-	if loc, ok := uniforms[at.uniformName]; ok {
+	if loc, ok := state.Uniforms[at.uniformName]; ok {
 		freqs := fft.FFTReal(period)
 		textureData := make([]uint8, audioTexWidth*2)
 		for x := 0; x < audioTexWidth/2; x++ {
@@ -171,22 +171,22 @@ func (at *audioTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.R
 		gl.Uniform1i(loc.Location, int32(at.index))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
-		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
 		}
 	}
-	if loc, ok := uniforms[fmt.Sprintf("%sSize", at.uniformName)]; ok {
+	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", at.uniformName)]; ok {
 		gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
 	}
 	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
-		if loc, ok := uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
+		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
 			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 		}
 	}
-	if loc, ok := uniforms[fmt.Sprintf("%sCurTime", at.uniformName)]; ok {
+	if loc, ok := state.Uniforms[fmt.Sprintf("%sCurTime", at.uniformName)]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
-	if loc, ok := uniforms["iSampleRate"]; ok {
+	if loc, ok := state.Uniforms["iSampleRate"]; ok {
 		gl.Uniform1f(loc.Location, at.source.SampleRate())
 	}
 }

@@ -121,18 +121,18 @@ func (st *ShaderToy) Setup() error {
 	return nil
 }
 
-func (st ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
+func (st ShaderToy) PreRender(state glsl.RenderState) {
 	// https://shadertoyunofficial.wordpress.com/2016/07/20/special-shadertoy-features/
-	if loc, ok := uniforms["iResolution"]; ok {
+	if loc, ok := state.Uniforms["iResolution"]; ok {
 		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 0.0)
 	}
-	if loc, ok := uniforms["iTime"]; ok {
+	if loc, ok := state.Uniforms["iTime"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
-	if loc, ok := uniforms["iTimeDelta"]; ok {
+	if loc, ok := state.Uniforms["iTimeDelta"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Interval)/float32(time.Second))
 	}
-	if loc, ok := uniforms["iDate"]; ok {
+	if loc, ok := state.Uniforms["iDate"]; ok {
 		t := time.Now()
 		sinceMidnight := t.Sub(t.Truncate(time.Hour * 24))
 		gl.Uniform4f(loc.Location,
@@ -142,11 +142,11 @@ func (st ShaderToy) PreRender(uniforms map[string]glsl.Uniform, state glsl.Rende
 			float32(sinceMidnight)/float32(time.Second),
 		)
 	}
-	if loc, ok := uniforms["iFrame"]; ok {
+	if loc, ok := state.Uniforms["iFrame"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.FramesProcessed))
 	}
 	for _, resource := range st.resources {
-		resource.PreRender(uniforms, state)
+		resource.PreRender(state)
 	}
 }
 
@@ -165,7 +165,7 @@ func (st *ShaderToy) Close() error {
 
 type resource interface {
 	UniformSource() string
-	PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState)
+	PreRender(state glsl.RenderState)
 	Close() error
 }
 

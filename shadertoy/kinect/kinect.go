@@ -141,11 +141,11 @@ func (kin *Kinect) UniformSource() string {
 	`, kin.uniformName, kin.uniformName, kin.uniformName)
 }
 
-func (kin *Kinect) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
+func (kin *Kinect) PreRender(state glsl.RenderState) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 
-	if loc, ok := uniforms[kin.uniformName]; ok {
+	if loc, ok := state.Uniforms[kin.uniformName]; ok {
 		gl.ActiveTexture(gl.TEXTURE0 + kin.textureIndex)
 		gl.BindTexture(gl.TEXTURE_2D, kin.textureID)
 		gl.TexSubImage2D(
@@ -162,21 +162,13 @@ func (kin *Kinect) PreRender(uniforms map[string]glsl.Uniform, state glsl.Render
 		gl.Uniform1i(loc.Location, int32(kin.textureIndex))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(kin.uniformName); m != nil {
-		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(resolution.Dx()), float32(resolution.Dy()), 1.0)
 		}
 	}
-	if loc, ok := uniforms[fmt.Sprintf("%sSize", kin.uniformName)]; ok {
+	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", kin.uniformName)]; ok {
 		gl.Uniform3f(loc.Location, float32(resolution.Dx()), float32(resolution.Dy()), 1.0)
 	}
-	//	if m := ichannelNumRe.FindStringSubmatch(kin.uniformName); m != nil {
-	//		if loc, ok := uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
-	//			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
-	//		}
-	//	}
-	//	if loc, ok := uniforms[fmt.Sprintf("%sCurTime", kin.uniformName)]; ok {
-	//		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
-	//	}
 }
 
 func (kin *Kinect) freenectLoop() {

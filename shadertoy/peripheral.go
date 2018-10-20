@@ -117,8 +117,8 @@ func (pr *periphMat4) UniformSource() string {
 	return fmt.Sprintf("uniform mat4 %s;", pr.uniformName)
 }
 
-func (pr *periphMat4) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
-	if loc, ok := uniforms[pr.uniformName]; ok {
+func (pr *periphMat4) PreRender(state glsl.RenderState) {
+	if loc, ok := state.Uniforms[pr.uniformName]; ok {
 		pr.currentValueLock.Lock()
 		gl.UniformMatrix4fv(loc.Location, 1, false, &pr.currentValue[0])
 		pr.currentValueLock.Unlock()

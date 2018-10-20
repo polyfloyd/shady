@@ -102,18 +102,18 @@ func (tex *imageTexture) UniformSource() string {
 	`, tex.uniformName, tex.uniformName)
 }
 
-func (tex *imageTexture) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
-	if loc, ok := uniforms[tex.uniformName]; ok {
+func (tex *imageTexture) PreRender(state glsl.RenderState) {
+	if loc, ok := state.Uniforms[tex.uniformName]; ok {
 		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
 		gl.BindTexture(gl.TEXTURE_2D, tex.id)
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
-		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(tex.rect.Dx()), float32(tex.rect.Dy()), 1.0)
 		}
 	}
-	if loc, ok := uniforms[fmt.Sprintf("%sSize", tex.uniformName)]; ok {
+	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", tex.uniformName)]; ok {
 		gl.Uniform3f(loc.Location, float32(tex.rect.Dx()), float32(tex.rect.Dy()), 1.0)
 	}
 }
@@ -142,18 +142,18 @@ func (tex *backBufferImage) UniformSource() string {
 	`, tex.uniformName, tex.uniformName)
 }
 
-func (tex *backBufferImage) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
-	if loc, ok := uniforms[tex.uniformName]; ok {
+func (tex *backBufferImage) PreRender(state glsl.RenderState) {
+	if loc, ok := state.Uniforms[tex.uniformName]; ok {
 		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
 		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID())
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
-		if loc, ok := uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
+		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 1.0)
 		}
 	}
-	if loc, ok := uniforms[fmt.Sprintf("%sSize", tex.uniformName)]; ok {
+	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", tex.uniformName)]; ok {
 		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 1.0)
 	}
 }

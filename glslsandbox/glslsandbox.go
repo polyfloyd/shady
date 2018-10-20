@@ -43,20 +43,20 @@ func (gs GLSLSandbox) Sources() (map[glsl.Stage][]glsl.Source, error) {
 
 func (GLSLSandbox) Setup() error { return nil }
 
-func (GLSLSandbox) PreRender(uniforms map[string]glsl.Uniform, state glsl.RenderState) {
-	if loc, ok := uniforms["resolution"]; ok {
+func (GLSLSandbox) PreRender(state glsl.RenderState) {
+	if loc, ok := state.Uniforms["resolution"]; ok {
 		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))
 	}
-	if loc, ok := uniforms["time"]; ok {
+	if loc, ok := state.Uniforms["time"]; ok {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
-	if loc, ok := uniforms["mouse"]; ok {
+	if loc, ok := state.Uniforms["mouse"]; ok {
 		gl.Uniform2f(loc.Location, float32(state.CanvasWidth)*0.5, float32(state.CanvasHeight)*0.5)
 	}
-	if loc, ok := uniforms["surfaceSize"]; ok {
+	if loc, ok := state.Uniforms["surfaceSize"]; ok {
 		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))
 	}
-	if loc, ok := uniforms["backbuffer"]; ok {
+	if loc, ok := state.Uniforms["backbuffer"]; ok {
 		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID())
 		gl.ActiveTexture(gl.TEXTURE0)
 		gl.Uniform1i(loc.Location, 0)

@@ -43,7 +43,7 @@ type Environment interface {
 	//
 	// sinceStart is the animation time elapsed since the first frame was
 	// rendered.
-	PreRender(uniforms map[string]Uniform, state RenderState)
+	PreRender(state RenderState)
 
 	// Close should shut down the environment by freeing all associated
 	// (OpenGL) resources.
@@ -58,6 +58,7 @@ type RenderState struct {
 	CanvasWidth  uint
 	CanvasHeight uint
 
+	Uniforms           map[string]Uniform
 	PreviousFrameTexID func() uint32
 }
 
