@@ -52,7 +52,7 @@ func newVideoTexture(uniformName, filename string, texIndex uint32, currentTime 
 		resolution:        resolution,
 		frameInterval:     interval,
 		stream:            stream,
-		currentVideoFrame: int(currentTime / interval),
+		currentVideoFrame: int(currentTime/interval) - 1,
 
 		cancel: cancel,
 	}
