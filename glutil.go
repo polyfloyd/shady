@@ -56,10 +56,6 @@ func GLDebugOutput() <-chan GLDebugMessage {
 		stackLen := runtime.Stack(stack[:], false)
 		dm.Stack = string(stack[:stackLen])
 
-		if dm.Severity != gl.DEBUG_SEVERITY_NOTIFICATION {
-			panic(fmt.Errorf("OpenGL %s: %s\n", dm.SeverityString(), dm.Message))
-		}
-
 		select {
 		case ch <- dm:
 		default:

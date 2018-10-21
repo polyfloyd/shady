@@ -157,7 +157,7 @@ func (sh *Shader) drawGeometry() {
 
 func (sh *Shader) Image() image.Image {
 	if err := sh.reloadEnvironment(context.Background()); err != nil {
-		log.Println(err)
+		log.Printf("Error reloading environment: %v", err)
 		return nil
 	}
 
@@ -175,8 +175,10 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 	var prevImageHandle interface{}
 	buffer := make(chan interface{}, sh.renderer.NumBuffers())
 	for {
-		if err := sh.reloadEnvironment(ctx); err != nil {
-			log.Println(err)
+		if err := sh.reloadEnvironment(ctx); err == context.Canceled {
+			return
+		} else if err != nil {
+			log.Printf("Error reloading environment: %v", err)
 			continue
 		}
 
@@ -224,7 +226,10 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 }
 
 func (sh *Shader) Close() error {
-	envErr := sh.env.Close()
+	var envErr error
+	if sh.env != nil {
+		envErr = sh.env.Close()
+	}
 	gl.DeleteProgram(sh.program)
 	gl.DeleteBuffers(1, &sh.canvas)
 	defer sh.display.Destroy()
