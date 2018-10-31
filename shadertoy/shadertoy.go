@@ -61,18 +61,20 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 		ss = append(ss, s)
 	}
 
+	glslVersion := "140"
+
 	return map[glsl.Stage][]glsl.Source{
-		glsl.StageVertex: {glsl.SourceBuf(`
-			#version 130
+		glsl.StageVertex: {glsl.SourceBuf(fmt.Sprintf(`
+			#version %s
 			attribute vec3 vert;
 			void main(void) {
 				gl_Position = vec4(vert, 1.0);
 			}
-		`)},
+		`, glslVersion))},
 		glsl.StageFragment: func() []glsl.Source {
 			ss := []glsl.Source{}
-			ss = append(ss, glsl.SourceBuf(`
-				#version 130
+			ss = append(ss, glsl.SourceBuf(fmt.Sprintf(`
+				#version %s
 				uniform vec3 iResolution;
 				uniform float iTime;
 				uniform float iTimeDelta;
@@ -82,7 +84,7 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 				uniform vec4 iDate;
 				uniform float iSampleRate;
 				uniform vec3 iChannelResolution[4];
-			`))
+			`, glslVersion)))
 			for _, res := range st.resources {
 				ss = append(ss, glsl.SourceBuf(res.UniformSource()))
 			}

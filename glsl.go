@@ -19,7 +19,8 @@ type Shader struct {
 
 	display egl.Display
 	vertLoc uint32
-	canvas  uint32
+	vao     uint32
+	vbo     uint32
 
 	uniforms map[string]Uniform
 	renderer renderer
@@ -37,9 +38,17 @@ func NewShader(width, height uint) (*Shader, error) {
 	if err != nil {
 		return nil, err
 	}
-	surface := display.CreateSurface(width, height)
-	display.BindAPI(egl.OpenGLAPI)
-	glContext := display.CreateContext(surface)
+	surface, err := display.CreateSurface(width, height)
+	if err != nil {
+		return nil, err
+	}
+	if err := display.BindAPI(egl.OpenGLAPI); err != nil {
+		return nil, err
+	}
+	glContext, err := display.CreateContext(surface, 3, 3)
+	if err != nil {
+		return nil, err
+	}
 	glContext.MakeCurrent()
 
 	// Initialize OpenGL
@@ -76,8 +85,10 @@ func NewShader(width, height uint) (*Shader, error) {
 		-1.0, 1.0, 0.0,
 		1.0, 1.0, 0.0,
 	}
-	gl.GenBuffers(1, &sh.canvas)
-	gl.BindBuffer(gl.ARRAY_BUFFER, sh.canvas)
+	gl.GenVertexArrays(1, &sh.vao)
+	gl.BindVertexArray(sh.vao)
+	gl.GenBuffers(1, &sh.vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, sh.vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
 
 	return sh, nil
@@ -150,8 +161,8 @@ func (sh *Shader) SetEnvironment(env Environment) {
 }
 
 func (sh *Shader) drawGeometry() {
-	// Assumes sh.canvas is bound to GL_ARRAY_BUFFER and sh.program is the
-	// current shader program.
+	// Assumes sh.vao is the current vertex array, sh.vbo is bound to
+	// GL_ARRAY_BUFFER and sh.program is the current shader program.
 	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
@@ -231,7 +242,8 @@ func (sh *Shader) Close() error {
 		envErr = sh.env.Close()
 	}
 	gl.DeleteProgram(sh.program)
-	gl.DeleteBuffers(1, &sh.canvas)
+	gl.DeleteVertexArrays(1, &sh.vao)
+	gl.DeleteBuffers(1, &sh.vbo)
 	defer sh.display.Destroy()
 	if err := sh.renderer.Close(); err != nil {
 		return err

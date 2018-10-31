@@ -1,6 +1,6 @@
 package egl
 
-// #cgo LDFLAGS: -L. -lEGL
+// #cgo pkg-config: egl
 // #include <EGL/egl.h>
 import "C"
 import (
@@ -62,7 +62,7 @@ func (d Display) Destroy() {
 	C.eglTerminate(d.dpy)
 }
 
-func (d Display) CreateSurface(width, height uint) Surface {
+func (d Display) CreateSurface(width, height uint) (*Surface, error) {
 	configAttribs := []C.EGLint{
 		C.EGL_SURFACE_TYPE, C.EGL_PBUFFER_BIT,
 		C.EGL_BLUE_SIZE, 8,
@@ -78,31 +78,47 @@ func (d Display) CreateSurface(width, height uint) Surface {
 	}
 	var numConfigs C.EGLint
 	var eglCfg C.EGLConfig
-	C.eglChooseConfig(d.dpy, &configAttribs[0], &eglCfg, 1, &numConfigs)
+	if C.eglChooseConfig(d.dpy, &configAttribs[0], &eglCfg, 1, &numConfigs) == C.EGL_FALSE {
+		return nil, fmt.Errorf("failed to call eglChooseConfig")
+	}
 
 	eglSurf := C.eglCreatePbufferSurface(d.dpy, eglCfg, &pbufferAttribs[0])
-	return Surface{
+	if eglSurf == nil {
+		return nil, fmt.Errorf("failed to call eglCreatePbufferSurface")
+	}
+	return &Surface{
 		conf: eglCfg,
 		surf: eglSurf,
+	}, nil
+}
+
+func (d Display) BindAPI(api API) error {
+	if C.eglBindAPI(C.EGLenum(api)) == C.EGL_FALSE {
+		return fmt.Errorf("failed to call eglBindAPI")
 	}
+	return nil
 }
 
-func (d Display) BindAPI(api API) {
-	C.eglBindAPI(C.EGLenum(api))
-}
-
-func (d Display) CreateContext(surface Surface) Context {
-	context := C.eglCreateContext(d.dpy, surface.conf, nil, nil)
-	return Context{
+func (d Display) CreateContext(surface *Surface, openGLMajor, openGLMinor int) (*Context, error) {
+	attribs := []C.EGLint{
+		C.EGL_CONTEXT_MAJOR_VERSION, C.EGLint(openGLMajor),
+		C.EGL_CONTEXT_MINOR_VERSION, C.EGLint(openGLMinor),
+		C.EGL_NONE,
+	}
+	context := C.eglCreateContext(d.dpy, surface.conf, nil, &attribs[0])
+	if context == nil {
+		return nil, fmt.Errorf("failed to call eglCreateContext")
+	}
+	return &Context{
 		Display: d,
 		Surface: surface,
 		context: context,
-	}
+	}, nil
 }
 
 type Context struct {
 	Display Display
-	Surface Surface
+	Surface *Surface
 
 	context C.EGLContext
 }

@@ -12,9 +12,17 @@ func initTestGL(t *testing.T) {
 	if err != nil {
 		t.Skip()
 	}
-	surface := display.CreateSurface(1, 1)
-	display.BindAPI(egl.OpenGLAPI)
-	context := display.CreateContext(surface)
+	surface, err := display.CreateSurface(1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := display.BindAPI(egl.OpenGLAPI); err != nil {
+		t.Fatal(err)
+	}
+	context, err := display.CreateContext(surface, 3, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
 	context.MakeCurrent()
 	if err := gl.Init(); err != nil {
 		t.Skip()
