@@ -35,8 +35,6 @@ import (
 	"github.com/polyfloyd/shady"
 )
 
-const format = C.FREENECT_VIDEO_RGB
-
 var (
 	resolution = image.Rect(0, 0, 640, 480)
 	gamma      [2048]uint8
@@ -97,9 +95,10 @@ func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 		return nil, fmt.Errorf("could not open Kinect device")
 	}
 
+	C.freenect_set_user(kin.dev, unsafe.Pointer(kin))
+
 	gl.GenTextures(1, &kin.textureID)
 	gl.BindTexture(gl.TEXTURE_2D, kin.textureID)
-
 	gl.TexImage2D(
 		gl.TEXTURE_2D,          // target
 		0,                      // level
@@ -115,11 +114,6 @@ func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-
-	if instance != nil {
-		return nil, fmt.Errorf("only one Kinect can be enabled at a time")
-	}
-	instance = kin
 
 	go kin.freenectLoop()
 
@@ -179,7 +173,7 @@ func (kin *Kinect) freenectLoop() {
 	C.freenect_set_tilt_degs(kin.dev, C.double(tiltAngle))
 	C.freenect_set_led(kin.dev, C.LED_GREEN)
 	C.init_callbacks_cgo(kin.dev)
-	C.freenect_set_video_mode(kin.dev, C.freenect_find_video_mode(C.FREENECT_RESOLUTION_MEDIUM, format))
+	C.freenect_set_video_mode(kin.dev, C.freenect_find_video_mode(C.FREENECT_RESOLUTION_MEDIUM, C.FREENECT_VIDEO_RGB))
 	C.freenect_set_depth_mode(kin.dev, C.freenect_find_depth_mode(C.FREENECT_RESOLUTION_MEDIUM, C.FREENECT_DEPTH_11BIT))
 	C.freenect_start_depth(kin.dev)
 	C.freenect_start_video(kin.dev)
