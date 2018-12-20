@@ -82,10 +82,10 @@ func newImageTexture(img image.Image, uniformName string, texIndex uint32) (*ima
 		gl.RGBA,                  // internalFormat
 		int32(img.Bounds().Dx()), // width
 		int32(img.Bounds().Dy()), // height
-		0,                   // border
-		gl.RGBA,             // format
-		gl.UNSIGNED_BYTE,    // type
-		gl.Ptr(rgbaImg.Pix), // data
+		0,                        // border
+		gl.RGBA,                  // format
+		gl.UNSIGNED_BYTE,         // type
+		gl.Ptr(rgbaImg.Pix),      // data
 	)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)

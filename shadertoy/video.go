@@ -109,15 +109,15 @@ func (vt *videoTexture) PreRender(state glsl.RenderState) {
 		gl.ActiveTexture(gl.TEXTURE0 + vt.index)
 		gl.BindTexture(gl.TEXTURE_2D, vt.id)
 		gl.TexSubImage2D(
-			gl.TEXTURE_2D, // target,
-			0,             // level,
-			0,             // xoffset,
-			0,             // yoffset,
+			gl.TEXTURE_2D,             // target,
+			0,                         // level,
+			0,                         // xoffset,
+			0,                         // yoffset,
 			int32(vt.resolution.Dx()), // width,
 			int32(vt.resolution.Dy()), // height,
-			gl.RGB,           // format,
-			gl.UNSIGNED_BYTE, // type,
-			gl.Ptr(frame),    // data
+			gl.RGB,                    // format,
+			gl.UNSIGNED_BYTE,          // type,
+			gl.Ptr(frame),             // data
 		)
 		gl.Uniform1i(loc.Location, int32(vt.index))
 	}

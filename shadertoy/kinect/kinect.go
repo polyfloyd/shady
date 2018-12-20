@@ -100,11 +100,11 @@ func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 	gl.GenTextures(1, &kin.textureID)
 	gl.BindTexture(gl.TEXTURE_2D, kin.textureID)
 	gl.TexImage2D(
-		gl.TEXTURE_2D,          // target
-		0,                      // level
-		gl.RGBA,                // internalFormat
-		int32(resolution.Dx()), // width
-		int32(resolution.Dy()), // height
+		gl.TEXTURE_2D,                // target
+		0,                            // level
+		gl.RGBA,                      // internalFormat
+		int32(resolution.Dx()),       // width
+		int32(resolution.Dy()),       // height
 		0,                            // border
 		gl.RGBA,                      // format
 		gl.UNSIGNED_BYTE,             // type
@@ -143,10 +143,10 @@ func (kin *Kinect) PreRender(state glsl.RenderState) {
 		gl.ActiveTexture(gl.TEXTURE0 + kin.textureIndex)
 		gl.BindTexture(gl.TEXTURE_2D, kin.textureID)
 		gl.TexSubImage2D(
-			gl.TEXTURE_2D, // target,
-			0,             // level,
-			0,             // xoffset,
-			0,             // yoffset,
+			gl.TEXTURE_2D,                // target,
+			0,                            // level,
+			0,                            // xoffset,
+			0,                            // yoffset,
 			int32(resolution.Dx()),       // width,
 			int32(resolution.Dy()),       // height,
 			gl.RGBA,                      // format,
