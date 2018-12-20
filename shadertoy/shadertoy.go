@@ -10,11 +10,11 @@ import (
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 
-	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func init() {
-	glsl.RegisterEnvironmentDetector(func(shaderSource string) string {
+	renderer.RegisterEnvironmentDetector(func(shaderSource string) string {
 		// The mainImage function should always be present in ShaderToy image
 		// shaders.
 		reShaderToy := regexp.MustCompile(`void\s+mainImage\s*\(\s*out\s+vec4\s+\w+\s*,\s*(?:in)?\s+vec2\s+\w+\s*\)`)
@@ -43,37 +43,37 @@ var texIndexEnum uint32
 //
 // The functions are called with the mapping that should be instantiated, the
 // current working directory and an enumerator for texture IDs.
-var resourceBuilders = map[string]func(Mapping, string, *uint32, glsl.RenderState) (resource, error){}
+var resourceBuilders = map[string]func(Mapping, string, *uint32, renderer.RenderState) (resource, error){}
 
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
 type ShaderToy struct {
-	ShaderSources []glsl.SourceFile
+	ShaderSources []renderer.SourceFile
 	ResolveDir    string
 	Mappings      []Mapping
 
 	resources []resource
 }
 
-func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
-	ss := make([]glsl.Source, 0, len(st.ShaderSources))
+func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
+	ss := make([]renderer.Source, 0, len(st.ShaderSources))
 	for _, s := range st.ShaderSources {
 		ss = append(ss, s)
 	}
 
 	glslVersion := "140"
 
-	return map[glsl.Stage][]glsl.Source{
-		glsl.StageVertex: {glsl.SourceBuf(fmt.Sprintf(`
+	return map[renderer.Stage][]renderer.Source{
+		renderer.StageVertex: {renderer.SourceBuf(fmt.Sprintf(`
 			#version %s
 			attribute vec3 vert;
 			void main(void) {
 				gl_Position = vec4(vert, 1.0);
 			}
 		`, glslVersion))},
-		glsl.StageFragment: func() []glsl.Source {
-			ss := []glsl.Source{}
-			ss = append(ss, glsl.SourceBuf(fmt.Sprintf(`
+		renderer.StageFragment: func() []renderer.Source {
+			ss := []renderer.Source{}
+			ss = append(ss, renderer.SourceBuf(fmt.Sprintf(`
 				#version %s
 				uniform vec3 iResolution;
 				uniform float iTime;
@@ -86,12 +86,12 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 				uniform vec3 iChannelResolution[4];
 			`, glslVersion)))
 			for _, res := range st.resources {
-				ss = append(ss, glsl.SourceBuf(res.UniformSource()))
+				ss = append(ss, renderer.SourceBuf(res.UniformSource()))
 			}
 			for _, s := range st.ShaderSources {
 				ss = append(ss, s)
 			}
-			ss = append(ss, glsl.SourceBuf(`
+			ss = append(ss, renderer.SourceBuf(`
 				void main(void) {
 					mainImage(gl_FragColor, gl_FragCoord.xy);
 				}
@@ -101,8 +101,8 @@ func (st ShaderToy) Sources() (map[glsl.Stage][]glsl.Source, error) {
 	}, nil
 }
 
-func (st *ShaderToy) Setup(state glsl.RenderState) error {
-	ss := make([]glsl.Source, 0, len(st.ShaderSources))
+func (st *ShaderToy) Setup(state renderer.RenderState) error {
+	ss := make([]renderer.Source, 0, len(st.ShaderSources))
 	for _, s := range st.ShaderSources {
 		ss = append(ss, s)
 	}
@@ -123,7 +123,7 @@ func (st *ShaderToy) Setup(state glsl.RenderState) error {
 	return nil
 }
 
-func (st ShaderToy) PreRender(state glsl.RenderState) {
+func (st ShaderToy) PreRender(state renderer.RenderState) {
 	// https://shadertoyunofficial.wordpress.com/2016/07/20/special-shadertoy-features/
 	if loc, ok := state.Uniforms["iResolution"]; ok {
 		gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 0.0)
@@ -167,7 +167,7 @@ func (st *ShaderToy) Close() error {
 
 type resource interface {
 	UniformSource() string
-	PreRender(state glsl.RenderState)
+	PreRender(state renderer.RenderState)
 	Close() error
 }
 
@@ -191,7 +191,7 @@ func ParseMapping(str string) (Mapping, error) {
 	return Mapping{}, fmt.Errorf("unable to parse mapping from %q", str)
 }
 
-func extractMappings(shaderSources []glsl.Source) ([]Mapping, error) {
+func extractMappings(shaderSources []renderer.Source) ([]Mapping, error) {
 	mappings := []Mapping{}
 	for _, s := range shaderSources {
 		src, err := s.Contents()
@@ -227,7 +227,7 @@ func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	return outMappings
 }
 
-func (m Mapping) resource(pwd string, state glsl.RenderState) (resource, error) {
+func (m Mapping) resource(pwd string, state renderer.RenderState) (resource, error) {
 	fn, ok := resourceBuilders[m.Namespace]
 	if !ok {
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)

@@ -32,7 +32,7 @@ import (
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 
-	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/renderer"
 )
 
 var (
@@ -135,7 +135,7 @@ func (kin *Kinect) UniformSource() string {
 	`, kin.uniformName, kin.uniformName, kin.uniformName)
 }
 
-func (kin *Kinect) PreRender(state glsl.RenderState) {
+func (kin *Kinect) PreRender(state renderer.RenderState) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 

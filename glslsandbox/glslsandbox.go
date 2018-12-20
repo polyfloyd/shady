@@ -5,11 +5,12 @@ import (
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
-	"github.com/polyfloyd/shady"
+
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func init() {
-	glsl.RegisterEnvironmentDetector(func(shaderSource string) string {
+	renderer.RegisterEnvironmentDetector(func(shaderSource string) string {
 		// Quick and dirty: run some regular expressions on the source to infer
 		// the environment.
 		reGLSLSandbox := regexp.MustCompile(`uniform\s+vec2\s+resolution`)
@@ -23,12 +24,12 @@ func init() {
 // GLSLSandbox implements the Environment interface to simulate the canvas of glslsandbox.com.
 type GLSLSandbox struct {
 	// Source is the single fragment shader that should be used for rendering.
-	ShaderSources []glsl.Source
+	ShaderSources []renderer.Source
 }
 
-func (gs GLSLSandbox) Sources() (map[glsl.Stage][]glsl.Source, error) {
-	return map[glsl.Stage][]glsl.Source{
-		glsl.StageVertex: {glsl.SourceBuf(`
+func (gs GLSLSandbox) Sources() (map[renderer.Stage][]renderer.Source, error) {
+	return map[renderer.Stage][]renderer.Source{
+		renderer.StageVertex: {renderer.SourceBuf(`
 			attribute vec3 vert;
 			varying vec2 surfacePosition;
 
@@ -37,13 +38,13 @@ func (gs GLSLSandbox) Sources() (map[glsl.Stage][]glsl.Source, error) {
 				gl_Position = vec4(vert, 1.0);
 			}
 		`)},
-		glsl.StageFragment: gs.ShaderSources,
+		renderer.StageFragment: gs.ShaderSources,
 	}, nil
 }
 
-func (GLSLSandbox) Setup(glsl.RenderState) error { return nil }
+func (GLSLSandbox) Setup(renderer.RenderState) error { return nil }
 
-func (GLSLSandbox) PreRender(state glsl.RenderState) {
+func (GLSLSandbox) PreRender(state renderer.RenderState) {
 	if loc, ok := state.Uniforms["resolution"]; ok {
 		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))
 	}

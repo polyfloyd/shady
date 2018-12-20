@@ -10,11 +10,12 @@ import (
 	"strings"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
-	"github.com/polyfloyd/shady"
+
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func init() {
-	resourceBuilders["builtin"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
+	resourceBuilders["builtin"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
 		switch m.Value {
 		case "Back Buffer":
 			r := &backBufferImage{
@@ -35,7 +36,7 @@ func init() {
 			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
 		}
 	}
-	resourceBuilders["image"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
+	resourceBuilders["image"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
 		fd, err := os.Open(resolvePath(pwd, m.Value))
 		if err != nil {
 			return nil, err
@@ -102,7 +103,7 @@ func (tex *imageTexture) UniformSource() string {
 	`, tex.uniformName, tex.uniformName)
 }
 
-func (tex *imageTexture) PreRender(state glsl.RenderState) {
+func (tex *imageTexture) PreRender(state renderer.RenderState) {
 	if loc, ok := state.Uniforms[tex.uniformName]; ok {
 		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
 		gl.BindTexture(gl.TEXTURE_2D, tex.id)
@@ -142,7 +143,7 @@ func (tex *backBufferImage) UniformSource() string {
 	`, tex.uniformName, tex.uniformName)
 }
 
-func (tex *backBufferImage) PreRender(state glsl.RenderState) {
+func (tex *backBufferImage) PreRender(state renderer.RenderState) {
 	if loc, ok := state.Uniforms[tex.uniformName]; ok {
 		gl.ActiveTexture(gl.TEXTURE0 + tex.index)
 		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID())

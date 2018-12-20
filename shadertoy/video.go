@@ -12,11 +12,12 @@ import (
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
-	"github.com/polyfloyd/shady"
+
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func init() {
-	resourceBuilders["video"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
+	resourceBuilders["video"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
 		r, err := newVideoTexture(m.Name, resolvePath(pwd, m.Value), *texIndexEnum, state.Time)
 		*texIndexEnum++
 		return r, err
@@ -86,7 +87,7 @@ func (vt *videoTexture) UniformSource() string {
 	`, vt.uniformName, vt.uniformName, vt.uniformName)
 }
 
-func (vt *videoTexture) PreRender(state glsl.RenderState) {
+func (vt *videoTexture) PreRender(state renderer.RenderState) {
 	nextFrameTime := time.Duration(vt.currentVideoFrame+1) * vt.frameInterval
 	if state.Time < nextFrameTime {
 		return

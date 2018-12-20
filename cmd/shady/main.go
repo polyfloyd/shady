@@ -18,9 +18,9 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/polyfloyd/shady"
 	"github.com/polyfloyd/shady/encode"
 	"github.com/polyfloyd/shady/glslsandbox"
+	"github.com/polyfloyd/shady/renderer"
 	"github.com/polyfloyd/shady/shadertoy"
 )
 
@@ -126,7 +126,7 @@ func main() {
 		cancel()
 	}()
 
-	sh, err := glsl.NewShader(width, height)
+	sh, err := renderer.NewShader(width, height)
 	if err != nil {
 		log.Fatalf("Could initialize OpenGL: %v", err)
 	}
@@ -135,14 +135,14 @@ func main() {
 	for ctx.Err() == nil {
 		loopCtx, loopCancel := context.WithCancel(ctx)
 
-		env, watcher, err := func() (glsl.Environment, *fsnotify.Watcher, error) {
+		env, watcher, err := func() (renderer.Environment, *fsnotify.Watcher, error) {
 			watcher, err := fsnotify.NewWatcher()
 			if err != nil {
 				return nil, nil, err
 			}
 
 			// Load the shader sources.
-			sources, err := glsl.Includes([]string(inputFiles)...)
+			sources, err := renderer.Includes([]string(inputFiles)...)
 			if err != nil {
 				for _, src := range inputFiles {
 					watcher.Add(src)
@@ -159,17 +159,17 @@ func main() {
 					if err != nil {
 						return nil, watcher, err
 					}
-					*envName = glsl.DetectEnvironment(string(src))
+					*envName = renderer.DetectEnvironment(string(src))
 				}
 				if *envName == "" {
 					return nil, watcher, fmt.Errorf("Unable to detect the environment to use. Please set it using -env")
 				}
 			}
 
-			var env glsl.Environment
+			var env renderer.Environment
 			switch *envName {
 			case "glslsandbox":
-				ss := make([]glsl.Source, 0, len(sources))
+				ss := make([]renderer.Source, 0, len(sources))
 				for _, s := range sources {
 					ss = append(ss, s)
 				}

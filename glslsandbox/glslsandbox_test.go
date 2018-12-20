@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func TestDetectEnvironment(t *testing.T) {
@@ -17,7 +17,7 @@ func TestDetectEnvironment(t *testing.T) {
 		`uniform  vec2  resolution;`,
 	}
 	for _, s := range sources {
-		env := glsl.DetectEnvironment(s)
+		env := renderer.DetectEnvironment(s)
 		if env == "" {
 			t.Fatalf("unable to detect environment from source: %q", s)
 		}
@@ -33,15 +33,15 @@ func TestOutputSize(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := glsl.SourceBuf(`
+	source := renderer.SourceBuf(`
 		void main(void) {
 			gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 		}
 	`)
-	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
+	env := GLSLSandbox{ShaderSources: []renderer.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h)
+	shader, err := renderer.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestColorOrdering(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := glsl.SourceBuf(`
+	source := renderer.SourceBuf(`
 		void main(void) {
 			if (gl_FragCoord.y <= 1.0) {
 				gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
@@ -76,10 +76,10 @@ func TestColorOrdering(t *testing.T) {
 			}
 		}
 	`)
-	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
+	env := GLSLSandbox{ShaderSources: []renderer.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h)
+	shader, err := renderer.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestAnimationTime(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := glsl.SourceBuf(`
+	source := renderer.SourceBuf(`
 		uniform float time;
 		void main(void) {
 			if (time <= 0.5) {
@@ -128,10 +128,10 @@ func TestAnimationTime(t *testing.T) {
 			}
 		}
 	`)
-	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
+	env := GLSLSandbox{ShaderSources: []renderer.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h)
+	shader, err := renderer.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestAnimationBackbuffer(t *testing.T) {
 	}
 
 	const w, h = 512, 512
-	source := glsl.SourceBuf(`
+	source := renderer.SourceBuf(`
 		uniform sampler2D backbuffer;
 		void main(void) {
 			vec4 c = texture2D(backbuffer, gl_FragCoord.xy);
@@ -186,10 +186,10 @@ func TestAnimationBackbuffer(t *testing.T) {
 			}
 		}
 	`)
-	env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
+	env := GLSLSandbox{ShaderSources: []renderer.Source{source}}
 
 	runtime.LockOSThread()
-	shader, err := glsl.NewShader(w, h)
+	shader, err := renderer.NewShader(w, h)
 	if err != nil {
 		t.Fatal(err)
 	}

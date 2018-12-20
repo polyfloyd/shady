@@ -1,11 +1,11 @@
-package glsl
+package renderer
 
 import (
 	"testing"
 )
 
 func TestPlain(t *testing.T) {
-	sources, err := Includes("testdata/preprocessor/include-none.glsl")
+	sources, err := Includes("../testdata/preprocessor/include-none.glsl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,7 +15,7 @@ func TestPlain(t *testing.T) {
 }
 
 func TestIncludeSingle(t *testing.T) {
-	sources, err := Includes("testdata/preprocessor/include-single.glsl")
+	sources, err := Includes("../testdata/preprocessor/include-single.glsl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +25,7 @@ func TestIncludeSingle(t *testing.T) {
 }
 
 func TestIncludeRecursive(t *testing.T) {
-	sources, err := Includes("testdata/preprocessor/include-recursive.glsl")
+	sources, err := Includes("../testdata/preprocessor/include-recursive.glsl")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestIncludeRecursive(t *testing.T) {
 }
 
 func TestStopRecursionCycle(t *testing.T) {
-	sources, err := Includes("testdata/preprocessor/include-cycle.glsl")
+	sources, err := Includes("../testdata/preprocessor/include-cycle.glsl")
 	if err != nil {
 		t.Fatal(err)
 	}

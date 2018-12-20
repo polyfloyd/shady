@@ -1,4 +1,4 @@
-package glsl
+package renderer
 
 import (
 	"fmt"

@@ -3,7 +3,7 @@ package shadertoy
 import (
 	"testing"
 
-	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func TestDetectEnvironment(t *testing.T) {
@@ -14,7 +14,7 @@ func TestDetectEnvironment(t *testing.T) {
 		`void   mainImage  (  out  vec4  o  ,  in   vec2  i  )  {  }`,
 	}
 	for _, s := range sources {
-		env := glsl.DetectEnvironment(s)
+		env := renderer.DetectEnvironment(s)
 		if env == "" {
 			t.Fatalf("unable to detect environment from source: %q", s)
 		}

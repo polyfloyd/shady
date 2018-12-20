@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
-	"github.com/polyfloyd/shady"
 	"github.com/tarm/serial"
+
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func init() {
-	resourceBuilders["perip_mat4"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
+	resourceBuilders["perip_mat4"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
 		return newMat4Peripheral(m.Name, pwd, m.Value)
 	}
 }
@@ -117,7 +118,7 @@ func (pr *periphMat4) UniformSource() string {
 	return fmt.Sprintf("uniform mat4 %s;", pr.uniformName)
 }
 
-func (pr *periphMat4) PreRender(state glsl.RenderState) {
+func (pr *periphMat4) PreRender(state renderer.RenderState) {
 	if loc, ok := state.Uniforms[pr.uniformName]; ok {
 		pr.currentValueLock.Lock()
 		gl.UniformMatrix4fv(loc.Location, 1, false, &pr.currentValue[0])

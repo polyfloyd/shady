@@ -8,21 +8,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/polyfloyd/shady"
+	"github.com/polyfloyd/shady/renderer"
 )
 
-const shaderPlain = glsl.SourceBuf(`
+const shaderPlain = renderer.SourceBuf(`
 	void main(void) {
 		gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 	}
 `)
-const shaderWave = glsl.SourceBuf(`
+const shaderWave = renderer.SourceBuf(`
 	void main(void) {
 		gl_FragColor = vec4(cos(gl_FragCoord.x), sin(gl_FragCoord.y), 0.0, 1.0);
 	}
 `)
 
-var sources = map[string]glsl.Source{
+var sources = map[string]renderer.Source{
 	"plain": shaderPlain,
 	"wave":  shaderWave,
 }
@@ -33,11 +33,11 @@ func BenchmarkRenderImage(b *testing.B) {
 	}
 
 	for name, source := range sources {
-		env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
+		env := GLSLSandbox{ShaderSources: []renderer.Source{source}}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
-			shader, err := glsl.NewShader(512, 512)
+			shader, err := renderer.NewShader(512, 512)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -58,11 +58,11 @@ func BenchmarkRenderAnimation(b *testing.B) {
 	}
 
 	for name, source := range sources {
-		env := GLSLSandbox{ShaderSources: []glsl.Source{source}}
+		env := GLSLSandbox{ShaderSources: []renderer.Source{source}}
 		b.Run(name, func(b *testing.B) {
 			runtime.LockOSThread()
 
-			shader, err := glsl.NewShader(512, 512)
+			shader, err := renderer.NewShader(512, 512)
 			if err != nil {
 				b.Fatal(err)
 			}

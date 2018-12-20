@@ -11,11 +11,12 @@ import (
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/mjibson/go-dsp/fft"
-	"github.com/polyfloyd/shady"
+
+	"github.com/polyfloyd/shady/renderer"
 )
 
 func init() {
-	resourceBuilders["audio"] = func(m Mapping, pwd string, texIndexEnum *uint32, state glsl.RenderState) (resource, error) {
+	resourceBuilders["audio"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
 		source, err := parseMappingValue(pwd, m.Value)
 		if err != nil {
 			return nil, err
@@ -135,7 +136,7 @@ func (at *audioTexture) UniformSource() string {
 	`, at.uniformName, at.uniformName, at.uniformName)
 }
 
-func (at *audioTexture) PreRender(state glsl.RenderState) {
+func (at *audioTexture) PreRender(state renderer.RenderState) {
 	period := at.source.ReadSamples(state.Interval)
 	if len(period) < audioTexWidth {
 		period = make([]float64, audioTexWidth)
