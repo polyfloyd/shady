@@ -161,8 +161,11 @@ func (sh *Shader) SetEnvironment(env Environment) {
 }
 
 func (sh *Shader) drawGeometry() {
-	// Assumes sh.vao is the current vertex array, sh.vbo is bound to
-	// GL_ARRAY_BUFFER and sh.program is the current shader program.
+	// Ensure that the render state is up to date.
+	gl.BindVertexArray(sh.vao)
+	gl.BindBuffer(gl.ARRAY_BUFFER, sh.vbo)
+	gl.UseProgram(sh.program)
+	// Render the geometry.
 	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
