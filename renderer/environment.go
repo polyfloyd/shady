@@ -39,6 +39,13 @@ type Environment interface {
 	// is rendered.
 	Setup(state RenderState) error
 
+	// SubEnvironments returns a set of environments which render output is
+	// required in this environment.
+	//
+	// The implementing environment is not required to retain any state of the
+	// environments returned.
+	SubEnvironments() map[string]SubEnvironment
+
 	// PreRender updates the program's uniform values for each next frame.
 	//
 	// sinceStart is the animation time elapsed since the first frame was
@@ -48,6 +55,11 @@ type Environment interface {
 	// Close should shut down the environment by freeing all associated
 	// (OpenGL) resources.
 	Close() error
+}
+
+type SubEnvironment struct {
+	Environment
+	Width, Height uint
 }
 
 type RenderState struct {
@@ -60,6 +72,10 @@ type RenderState struct {
 
 	Uniforms           map[string]Uniform
 	PreviousFrameTexID func() uint32
+
+	// SubBuffers contains the render output for each environment returned by
+	// SubEnvironments as a textureID.
+	SubBuffers map[string]uint32
 }
 
 func DetectEnvironment(shaderSource string) string {

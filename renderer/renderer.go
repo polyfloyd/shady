@@ -8,16 +8,19 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/polyfloyd/shady/egl"
 )
 
+var initGLOnce sync.Once
+
 type Shader struct {
 	w, h uint
 
-	display egl.Display
 	vertLoc uint32
 	vao     uint32
 	vbo     uint32
@@ -29,31 +32,35 @@ type Shader struct {
 	env     Environment
 	newEnvs chan Environment
 
-	time  time.Duration
-	frame uint64
+	subTargets map[string]*Shader
+
+	time            time.Duration
+	frame           uint64
+	prevFrameHandle interface{}
 }
 
-func NewShader(width, height uint) (*Shader, error) {
+func initGL() error {
+	// Set up a rendering context.
 	display, err := egl.GetDisplay(egl.DefaultDisplay)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	surface, err := display.CreateSurface(width, height)
+	surface, err := display.CreateSurface(1<<12, 1<<12)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := display.BindAPI(egl.OpenGLAPI); err != nil {
-		return nil, err
+		return err
 	}
 	glContext, err := display.CreateContext(surface, 3, 3)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	glContext.MakeCurrent()
 
-	// Initialize OpenGL
+	// Initialize OpenGL.
 	if err := gl.Init(); err != nil {
-		return nil, err
+		return err
 	}
 
 	debug := GLDebugOutput()
@@ -64,9 +71,23 @@ func NewShader(width, height uint) (*Shader, error) {
 			}
 		}
 	}()
+	return nil
+}
+
+func NewShader(width, height uint) (*Shader, error) {
+	// Hack: Unit tests require a different style of initialization. We'll
+	// detect whether we are running as a test for now.
+	var err error
+	if strings.HasSuffix(os.Args[0], ".test") {
+		err = initGL()
+	} else {
+		initGLOnce.Do(func() { err = initGL() })
+	}
+	if err != nil {
+		return nil, err
+	}
 
 	sh := &Shader{
-		display:  display,
 		w:        width,
 		h:        height,
 		renderer: &pboRenderer{w: width, h: height},
@@ -90,6 +111,8 @@ func NewShader(width, height uint) (*Shader, error) {
 	gl.GenBuffers(1, &sh.vbo)
 	gl.BindBuffer(gl.ARRAY_BUFFER, sh.vbo)
 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.BindVertexArray(0)
 
 	return sh, nil
 }
@@ -137,6 +160,19 @@ func (sh *Shader) reloadEnvironment(ctx context.Context) error {
 		return fmt.Errorf("error setting up environment: %v", err)
 	}
 
+	sh.subTargets = map[string]*Shader{}
+	for name, env := range env.SubEnvironments() {
+		s, err := NewShader(env.Width, env.Height)
+		if err != nil {
+			return err
+		}
+		s.SetEnvironment(env.Environment)
+		if err := s.reloadEnvironment(context.Background()); err != nil {
+			return err
+		}
+		sh.subTargets[name] = s
+	}
+
 	sources, err := env.Sources()
 	if err != nil {
 		return err
@@ -147,10 +183,7 @@ func (sh *Shader) reloadEnvironment(ctx context.Context) error {
 	}
 	gl.UseProgram(sh.program)
 	sh.uniforms = ListUniforms(sh.program)
-
 	sh.vertLoc = uint32(gl.GetAttribLocation(sh.program, gl.Str("vert\x00")))
-	gl.EnableVertexAttribArray(sh.vertLoc)
-	gl.VertexAttribPointer(sh.vertLoc, 3, gl.FLOAT, false, 0, nil)
 
 	sh.env = env
 	return nil
@@ -160,33 +193,69 @@ func (sh *Shader) SetEnvironment(env Environment) {
 	sh.newEnvs <- env
 }
 
-func (sh *Shader) drawGeometry() {
-	// Ensure that the render state is up to date.
-	gl.BindVertexArray(sh.vao)
-	gl.BindBuffer(gl.ARRAY_BUFFER, sh.vbo)
-	gl.UseProgram(sh.program)
-	// Render the geometry.
-	gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
-}
-
-func (sh *Shader) Image() image.Image {
+func (sh *Shader) nextHandle(interval time.Duration) interface{} {
 	if err := sh.reloadEnvironment(context.Background()); err != nil {
 		log.Printf("Error reloading environment: %v", err)
 		return nil
 	}
 
+	prevTexID, freePrevTexID := uint32(0), func() {}
+	getPrevTexID := func() uint32 {
+		if sh.prevFrameHandle != nil && prevTexID == 0 {
+			prevTexID, freePrevTexID = sh.renderer.Texture(sh.prevFrameHandle)
+		}
+		return prevTexID
+	}
+	defer freePrevTexID()
+
+	subTextures := map[string]uint32{}
+	freeSubTextures := []func(){}
+	for name, s := range sh.subTargets {
+		h := s.nextHandle(interval)
+		textureID, free := s.renderer.Texture(h)
+		subTextures[name] = textureID
+		freeSubTextures = append(freeSubTextures, free)
+	}
+	defer func() {
+		for _, free := range freeSubTextures {
+			free()
+		}
+	}()
+
+	// Ensure that the render state is up to date.
+	gl.BindVertexArray(sh.vao)
+	gl.BindBuffer(gl.ARRAY_BUFFER, sh.vbo)
+	gl.UseProgram(sh.program)
+	gl.EnableVertexAttribArray(sh.vertLoc)
+	gl.VertexAttribPointer(sh.vertLoc, 3, gl.FLOAT, false, 0, nil)
+
 	sh.env.PreRender(RenderState{
-		Time:         0,
-		CanvasWidth:  sh.w,
-		CanvasHeight: sh.h,
-		Uniforms:     sh.uniforms,
+		Time:               sh.time,
+		Interval:           interval,
+		FramesProcessed:    sh.frame,
+		CanvasWidth:        sh.w,
+		CanvasHeight:       sh.h,
+		Uniforms:           sh.uniforms,
+		PreviousFrameTexID: getPrevTexID,
+		SubBuffers:         subTextures,
 	})
-	handle := sh.renderer.Draw(sh.drawGeometry)
+	sh.time += interval
+	sh.frame++
+
+	// Render the geometry.
+	handle := sh.renderer.Draw(func() {
+		gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+	})
+	sh.prevFrameHandle = handle
+	return handle
+}
+
+func (sh *Shader) Image() image.Image {
+	handle := sh.nextHandle(0)
 	return sh.renderer.Image(handle)
 }
 
 func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream chan<- image.Image) {
-	var prevImageHandle interface{}
 	buffer := make(chan interface{}, sh.renderer.NumBuffers())
 	for {
 		if err := sh.reloadEnvironment(ctx); err == context.Canceled {
@@ -196,35 +265,9 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 			continue
 		}
 
-		var prevTexID uint32
-		getPrevTexID := func() uint32 { return 0 }
-		if prevImageHandle != nil {
-			getPrevTexID = func() uint32 {
-				if prevTexID == 0 {
-					prevTexID = sh.renderer.Texture(prevImageHandle)
-				}
-				return prevTexID
-			}
-		}
-		sh.env.PreRender(RenderState{
-			Time:               sh.time,
-			Interval:           interval,
-			FramesProcessed:    sh.frame,
-			CanvasWidth:        sh.w,
-			CanvasHeight:       sh.h,
-			Uniforms:           sh.uniforms,
-			PreviousFrameTexID: getPrevTexID,
-		})
-		sh.time += interval
-		sh.frame++
-
-		handle := sh.renderer.Draw(sh.drawGeometry)
+		handle := sh.nextHandle(interval)
 		buffer <- handle
-		prevImageHandle = handle
 
-		if prevImageHandle != nil {
-			sh.renderer.FreeTexture(prevTexID)
-		}
 		if len(buffer) != cap(buffer) {
 			// Give the first renders time to complete.
 			continue
@@ -244,10 +287,12 @@ func (sh *Shader) Close() error {
 	if sh.env != nil {
 		envErr = sh.env.Close()
 	}
+	for _, s := range sh.subTargets {
+		s.Close()
+	}
 	gl.DeleteProgram(sh.program)
 	gl.DeleteVertexArrays(1, &sh.vao)
 	gl.DeleteBuffers(1, &sh.vbo)
-	defer sh.display.Destroy()
 	if err := sh.renderer.Close(); err != nil {
 		return err
 	}
@@ -271,9 +316,7 @@ type renderer interface {
 
 	Draw(func()) (handle interface{})
 	Image(handle interface{}) image.Image
-
-	Texture(handle interface{}) uint32
-	FreeTexture(id uint32)
+	Texture(handle interface{}) (uint32, func())
 }
 
 type pboRenderer struct {
@@ -339,8 +382,9 @@ func (pr *pboRenderer) Draw(drawFunc func()) interface{} {
 	return pr.curTargetIndex
 }
 
-func (pr *pboRenderer) Texture(handle interface{}) (tex uint32) {
+func (pr *pboRenderer) Texture(handle interface{}) (uint32, func()) {
 	t := pr.targets[handle.(int)]
+	var tex uint32
 	gl.GenTextures(1, &tex)
 	gl.BindTexture(gl.TEXTURE_2D, tex)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, int32(pr.w), int32(pr.h), 0, gl.RGBA, gl.UNSIGNED_BYTE, nil)
@@ -353,11 +397,9 @@ func (pr *pboRenderer) Texture(handle interface{}) (tex uint32) {
 	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, int32(pr.w), int32(pr.h), gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	gl.BindBuffer(gl.PIXEL_UNPACK_BUFFER, 0)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-	return
-}
-
-func (pr *pboRenderer) FreeTexture(id uint32) {
-	gl.DeleteTextures(1, &id)
+	return tex, func() {
+		gl.DeleteTextures(1, &tex)
+	}
 }
 
 func (pr *pboRenderer) Close() error {

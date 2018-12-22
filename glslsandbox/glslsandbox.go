@@ -44,6 +44,8 @@ func (gs GLSLSandbox) Sources() (map[renderer.Stage][]renderer.Source, error) {
 
 func (GLSLSandbox) Setup(renderer.RenderState) error { return nil }
 
+func (GLSLSandbox) SubEnvironments() map[string]renderer.SubEnvironment { return nil }
+
 func (GLSLSandbox) PreRender(state renderer.RenderState) {
 	if loc, ok := state.Uniforms["resolution"]; ok {
 		gl.Uniform2f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight))

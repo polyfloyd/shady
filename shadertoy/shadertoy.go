@@ -4,6 +4,7 @@ import (
 	"fmt"
 	_ "image/jpeg"
 	_ "image/png"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -121,6 +122,24 @@ func (st *ShaderToy) Setup(state renderer.RenderState) error {
 	// If no mappings are found, we're good to go. If iChannels are referenced
 	// anyway we'll let OpenGL decide if we should abort.
 	return nil
+}
+
+func (st ShaderToy) SubEnvironments() map[string]renderer.SubEnvironment {
+	envs := map[string]renderer.SubEnvironment{}
+	for _, res := range st.resources {
+		if bi, ok := res.(*bufferImage); ok {
+			env := &ShaderToy{
+				ShaderSources: bi.sources,
+				ResolveDir:    filepath.Dir(bi.filename),
+			}
+			envs[bi.name] = renderer.SubEnvironment{
+				Environment: env,
+				Width:       bi.width,
+				Height:      bi.height,
+			}
+		}
+	}
+	return envs
 }
 
 func (st ShaderToy) PreRender(state renderer.RenderState) {
