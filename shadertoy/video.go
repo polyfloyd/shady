@@ -159,15 +159,15 @@ func decodeVideoFile(ctx context.Context, filename string, currentTime time.Dura
 	if iv, err := info.VideoFrameInterval(); err == nil {
 		interval = iv
 	}
-	duration, err := info.Duration()
-	if err != nil {
-		return image.Rectangle{}, 0, nil, err
+
+	seekToOffset := time.Duration(0)
+	if duration, err := info.Duration(); err == nil {
+		seekToOffset = currentTime % duration
 	}
 
 	out := make(chan interface{}, 4)
 	go func() {
 		defer close(out)
-		seekToOffset := currentTime % duration
 		for ctx.Err() == nil {
 			cmd := exec.CommandContext(
 				ctx,
