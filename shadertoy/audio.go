@@ -98,6 +98,8 @@ type audioTexture struct {
 	id          uint32
 	index       uint32
 	source      audioSource
+
+	prevPeriod []float64
 }
 
 func newAudioTexture(uniformName string, source audioSource, texIndex uint32) (*audioTexture, error) {
@@ -105,19 +107,20 @@ func newAudioTexture(uniformName string, source audioSource, texIndex uint32) (*
 		uniformName: uniformName,
 		index:       texIndex,
 		source:      source,
+		prevPeriod:  make([]float64, audioTexWidth),
 	}
 	gl.GenTextures(1, &at.id)
 	gl.BindTexture(gl.TEXTURE_2D, at.id)
 
-	var initialData [audioTexWidth * 2]byte
+	var initialData [audioTexWidth * 2 * 3]uint8
 	gl.TexImage2D(
 		gl.TEXTURE_2D,          // target
 		0,                      // level
-		glLUMINANCE,            // internalFormat
+		gl.RGBA,                // internalFormat
 		audioTexWidth,          // width
 		2,                      // height
 		0,                      // border
-		glLUMINANCE,            // format
+		gl.RGB,                 // format
 		gl.UNSIGNED_BYTE,       // type
 		gl.Ptr(initialData[:]), // data
 	)
@@ -137,25 +140,33 @@ func (at *audioTexture) UniformSource() string {
 }
 
 func (at *audioTexture) PreRender(state renderer.RenderState) {
-	period := at.source.ReadSamples(state.Interval)
-	if len(period) < audioTexWidth {
-		period = make([]float64, audioTexWidth)
-	} else {
-		period = period[len(period)-audioTexWidth:]
-	}
+	newPeriod := at.source.ReadSamples(state.Interval)
+	at.prevPeriod = append(at.prevPeriod, newPeriod...)[len(newPeriod):]
+	period := at.prevPeriod[len(at.prevPeriod)-audioTexWidth:]
 
 	if loc, ok := state.Uniforms[at.uniformName]; ok {
+		textureData := make([]uint8, audioTexWidth*2*3)
 		freqs := fft.FFTReal(period)
-		textureData := make([]uint8, audioTexWidth*2)
 		for x := 0; x < audioTexWidth/2; x++ {
 			// FFT
-			textureData[x*2] = uint8((real(freqs[x])*0.5 + 0.5) * 255.0)
-			textureData[x*2+1] = uint8((imag(freqs[x])*0.5 + 0.5) * 255.0)
+			fft1 := uint8((real(freqs[x])*0.5 + 0.5) * 255.0)
+			fft2 := uint8((imag(freqs[x])*0.5 + 0.5) * 255.0)
+			textureData[x*2*3+0] = fft1
+			textureData[x*2*3+1] = fft1
+			textureData[x*2*3+2] = fft1
+			textureData[(x*2+1)*3+0] = fft2
+			textureData[(x*2+1)*3+1] = fft2
+			textureData[(x*2+1)*3+2] = fft2
 		}
 		for x := 0; x < audioTexWidth; x++ {
 			// Wave
-			textureData[audioTexWidth+x] = uint8((period[x]*0.5 + 0.5) * 255.0)
+			wave := uint8((period[x]*0.5 + 0.5) * 255.0)
+			textureData[(audioTexWidth+x)*3+0] = wave
+			textureData[(audioTexWidth+x)*3+1] = wave
+			textureData[(audioTexWidth+x)*3+2] = wave
 		}
+
+		gl.ActiveTexture(gl.TEXTURE0 + at.index)
 		gl.BindTexture(gl.TEXTURE_2D, at.id)
 		gl.TexSubImage2D(
 			gl.TEXTURE_2D,       // target,
@@ -164,11 +175,10 @@ func (at *audioTexture) PreRender(state renderer.RenderState) {
 			0,                   // yoffset,
 			audioTexWidth,       // width,
 			2,                   // height,
-			glLUMINANCE,         // format,
+			gl.RGB,              // format,
 			gl.UNSIGNED_BYTE,    // type,
 			gl.Ptr(textureData), // data
 		)
-		gl.ActiveTexture(gl.TEXTURE0 + at.index)
 		gl.Uniform1i(loc.Location, int32(at.index))
 	}
 	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
@@ -199,7 +209,6 @@ func (at *audioTexture) Close() error {
 
 type audioSource interface {
 	SampleRate() float32
-
 	ReadSamples(period time.Duration) []float64
 }
 
@@ -215,7 +224,7 @@ func (s rawSource) SampleRate() float32 {
 
 func (s *rawSource) ReadSamples(period time.Duration) []float64 {
 	numBytes := s.format.Bits() / 8
-	buf := make([]byte, (time.Duration(s.sampleRate*s.channels*numBytes)*period)/time.Second)
+	buf := make([]byte, s.sampleRate*s.channels*int(period)/int(time.Second)*numBytes)
 	n, err := io.ReadAtLeast(s.file, buf, len(buf))
 	if err != nil {
 		return make([]float64, time.Duration(s.sampleRate)*period/time.Second)
