@@ -1,3 +1,4 @@
+dist: xenial
 language: go
 go:
   - stable
@@ -11,7 +12,10 @@ env:
   - GO111MODULE=on
 
 install:
-  - sudo apt-get install libegl1-mesa-dev libusb-1.0-0-dev libfreenect-dev
+  - sudo apt-get install wget
+  - sudo apt-get install libegl1-mesa-dev libgl1-mesa-dev
+  - sudo apt-get install libusb-1.0-0-dev libfreenect-dev
+  -
   - go get -u golang.org/x/lint/golint
 
 before_script:
