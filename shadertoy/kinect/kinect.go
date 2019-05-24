@@ -40,6 +40,8 @@ var (
 	gamma      [2048]uint8
 )
 
+var instances sync.Map
+
 // TODO: duplicate
 var ichannelNumRe = regexp.MustCompile(`^iChannel(\d+)$`)
 
@@ -52,8 +54,9 @@ func init() {
 }
 
 type Kinect struct {
-	ctx *C.freenect_context
-	dev *C.freenect_device
+	ctx            *C.freenect_context
+	dev            *C.freenect_device
+	instanceHandle *struct{}
 
 	closed, loopClosed chan struct{}
 
@@ -67,11 +70,12 @@ type Kinect struct {
 
 func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 	kin := &Kinect{
-		closed:       make(chan struct{}),
-		loopClosed:   make(chan struct{}),
-		currentImage: image.NewRGBA(resolution),
-		uniformName:  uniformName,
-		textureIndex: textureIndex,
+		instanceHandle: &struct{}{},
+		closed:         make(chan struct{}),
+		loopClosed:     make(chan struct{}),
+		currentImage:   image.NewRGBA(resolution),
+		uniformName:    uniformName,
+		textureIndex:   textureIndex,
 	}
 
 	if C.freenect_init(&kin.ctx, C.NULL) < 0 {
@@ -95,7 +99,8 @@ func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 		return nil, fmt.Errorf("could not open Kinect device")
 	}
 
-	C.freenect_set_user(kin.dev, unsafe.Pointer(kin))
+	instances.Store(uintptr(unsafe.Pointer(kin.instanceHandle)), kin)
+	C.freenect_set_user(kin.dev, unsafe.Pointer(kin.instanceHandle))
 
 	gl.GenTextures(1, &kin.textureID)
 	gl.BindTexture(gl.TEXTURE_2D, kin.textureID)
@@ -123,6 +128,7 @@ func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 func (kin *Kinect) Close() error {
 	close(kin.closed)
 	<-kin.loopClosed
+	instances.Delete(kin.instanceHandle)
 	gl.DeleteTextures(1, &kin.textureID)
 	return nil
 }
