@@ -41,15 +41,31 @@ func main() {
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
 	envName := flag.String("env", "", "The environment (aka website) to simulate. Valid values are \"glslsandbox\", \"shadertoy\" or \"\" to autodetect")
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
-	framerate := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
-	numFrames := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
-	duration := flag.Float64("duration", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
+	framerate := flag.Float64("f", 0, "Whether to animate using the specified number of frames per second")
+	numFrames := flag.Uint("n", 0, "Limit the number of frames in the animation. No limit is set by default")
+	duration := flag.Float64("d", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
+	framerateOld := flag.Float64("framerate", 0, "Whether to animate using the specified number of frames per second")
+	numFramesOld := flag.Uint("numframes", 0, "Limit the number of frames in the animation. No limit is set by default")
+	durationOld := flag.Float64("duration", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
 	realtime := flag.Bool("rt", false, "Render at the actual number of frames per second set by -framerate")
 	verbose := flag.Bool("v", false, "Show verbose output about rendering")
 	watch := flag.Bool("w", false, "Watch the shader source files for changes")
 	var shadertoyMappings arrayFlags
 	flag.Var(&shadertoyMappings, "map", "Specify or override ShaderToy input mappings")
 	flag.Parse()
+
+	if *framerateOld != 0 {
+		log.Println("-framerate is deprecated, please use -f")
+		*framerate = *framerateOld
+	}
+	if *numFramesOld != 0 {
+		log.Println("-numframes is deprecated, please use -n")
+		*numFrames = *numFramesOld
+	}
+	if *durationOld != 0.0 {
+		log.Println("-duration is deprecated, please use -d")
+		*framerate = *framerateOld
+	}
 
 	if *duration != 0.0 && *numFrames != 0 {
 		log.Fatalf("-duration and -numframes are mutually exclusive")

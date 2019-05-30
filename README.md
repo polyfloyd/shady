@@ -106,18 +106,18 @@ this:
 # display size. It is also possible to use the -g flag on both programs.
 export LEDCAT_GEOMETRY=128x128
 
-shady -i example.glsl -ofmt rgb24 -framerate 20 | ledcat --framerate 20 show
+shady -i example.glsl -ofmt rgb24 -f 20 | ledcat -f 20 show
 ```
 
 ### FFmpeg
 FFmpeg may be used to render to video files:
 ```
 # Render at 1024x768 at 20 fps and show it, the same as using `-ofmt x11`:
-shady -i example.glsl -ofmt rgb24 -g 1024x768 -framerate 20 \
-  | ffplay -f rawvideo -pixel_format rgb24 -video_size 1024x768 -framerate 20 -
+shady -i example.glsl -ofmt rgb24 -g 1024x768 -f 20 \
+  | ffplay -f rawvideo -pixel_format rgb24 -video_size 1024x768 -f 20 -
 
 # The same, but render 12 seconds to an MP4 file
-shady -i example.glsl -ofmt rgb24 -g 1024x768 -framerate 10 \
+shady -i example.glsl -ofmt rgb24 -g 1024x768 -f 10 \
   | ffmpeg -f rawvideo -pixel_format rgb24 -video_size 1024x768 \
     -framerate 10 -t 12 -i - example.mp4
 ```
@@ -140,7 +140,7 @@ load them in a loop.
 
 ```sh
 # Render a 20 second loop to a file:
-shady -i example.glsl -g 64x64 -framerate 60 -numframes $((20*60)) -ofmt rgb24 -o ./my-animation.bin
+shady -i example.glsl -g 64x64 -f 60 -n $((20*60)) -ofmt rgb24 -o ./my-animation.bin
 
 # Play the animation repeatedly:
 while true; do
