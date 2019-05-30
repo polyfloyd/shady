@@ -10,7 +10,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
-	"os"
+	"io/ioutil"
 	"os/exec"
 	"time"
 )
@@ -234,8 +234,8 @@ func (f *X11Display) EncodeAnimation(w io.Writer, stream <-chan image.Image, int
 		"-framerate", fmt.Sprintf("%f", 1./interval.Seconds()),
 		"-",
 	)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stderr
+	cmd.Stderr = ioutil.Discard
+	cmd.Stdout = ioutil.Discard
 	ffIn, err := cmd.StdinPipe()
 	if err != nil {
 		return err
