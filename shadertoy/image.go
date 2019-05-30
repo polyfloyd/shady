@@ -7,6 +7,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -169,8 +170,9 @@ func resolvePath(pwd, path string) string {
 		return path
 	}
 	if len(path) > 0 && path[0] == '~' {
-		home := os.Getenv("HOME")
-		if home == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Println(err)
 			return path
 		}
 		return filepath.Join(home, path[1:])
