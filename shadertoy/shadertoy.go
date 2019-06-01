@@ -4,7 +4,6 @@ import (
 	"fmt"
 	_ "image/jpeg"
 	_ "image/png"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -44,13 +43,12 @@ var texIndexEnum uint32
 //
 // The functions are called with the mapping that should be instantiated, the
 // current working directory and an enumerator for texture IDs.
-var resourceBuilders = map[string]func(Mapping, string, *uint32, renderer.RenderState) (resource, error){}
+var resourceBuilders = map[string]func(Mapping, *uint32, renderer.RenderState) (resource, error){}
 
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
 type ShaderToy struct {
 	ShaderSources []renderer.SourceFile
-	ResolveDir    string
 	Mappings      []Mapping
 
 	resources []resource
@@ -111,9 +109,10 @@ func (st *ShaderToy) Setup(state renderer.RenderState) error {
 	if err != nil {
 		return err
 	}
+	mappings = deduplicateMappings(append(st.Mappings, mappings...)...)
 
 	for _, mapping := range mappings {
-		res, err := mapping.resource(st.ResolveDir, state)
+		res, err := mapping.resource(state)
 		if err != nil {
 			return err
 		}
@@ -130,7 +129,6 @@ func (st ShaderToy) SubEnvironments() map[string]renderer.SubEnvironment {
 		if bi, ok := res.(*bufferImage); ok {
 			env := &ShaderToy{
 				ShaderSources: bi.sources,
-				ResolveDir:    filepath.Dir(bi.filename),
 			}
 			envs[bi.name] = renderer.SubEnvironment{
 				Environment: env,
@@ -196,15 +194,17 @@ type Mapping struct {
 	Name      string
 	Namespace string
 	Value     string
+	PWD       string
 }
 
-func ParseMapping(str string) (Mapping, error) {
+func ParseMapping(str, pwd string) (Mapping, error) {
 	match := inputMappingRe.FindStringSubmatch(str)
 	if match != nil {
 		return Mapping{
 			Name:      match[1],
 			Namespace: match[2],
 			Value:     match[3],
+			PWD:       pwd,
 		}, nil
 	}
 	return Mapping{}, fmt.Errorf("unable to parse mapping from %q", str)
@@ -223,6 +223,7 @@ func extractMappings(shaderSources []renderer.Source) ([]Mapping, error) {
 				Name:      string(match[1]),
 				Namespace: string(match[2]),
 				Value:     string(match[3]),
+				PWD:       s.Dir(),
 			})
 		}
 	}
@@ -246,10 +247,10 @@ func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	return outMappings
 }
 
-func (m Mapping) resource(pwd string, state renderer.RenderState) (resource, error) {
+func (m Mapping) resource(state renderer.RenderState) (resource, error) {
 	fn, ok := resourceBuilders[m.Namespace]
 	if !ok {
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
 	}
-	return fn(m, pwd, &texIndexEnum, state)
+	return fn(m, &texIndexEnum, state)
 }

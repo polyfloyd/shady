@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -193,7 +192,7 @@ func main() {
 			case "shadertoy":
 				mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
 				for _, str := range shadertoyMappings {
-					m, err := shadertoy.ParseMapping(str)
+					m, err := shadertoy.ParseMapping(str, ".")
 					if err != nil {
 						return nil, watcher, err
 					}
@@ -201,7 +200,6 @@ func main() {
 				}
 				env = &shadertoy.ShaderToy{
 					ShaderSources: sources,
-					ResolveDir:    filepath.Dir(inputFiles[len(inputFiles)-1]),
 					Mappings:      mappings,
 				}
 			default:

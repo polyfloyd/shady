@@ -16,8 +16,8 @@ import (
 )
 
 func init() {
-	resourceBuilders["audio"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
-		source, err := parseMappingValue(pwd, m.Value)
+	resourceBuilders["audio"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+		source, err := parseMappingValue(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
 		}

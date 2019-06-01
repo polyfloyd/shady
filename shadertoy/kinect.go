@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["kinect"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+	resourceBuilders["kinect"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
 		kin, err := kinect.Open(m.Name, *texIndexEnum)
 		if err != nil {
 			return nil, err

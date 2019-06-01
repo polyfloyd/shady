@@ -44,12 +44,22 @@ select this resource input mapping using dialogs. This implementation requires
 these mappings to be specified in the shader source. The respective uniform is
 declared automatically.
 
-Mappings can refer to other files such as images, videos and audio. Relative paths are resolved relative to the GLSL file that declared
+Mappings can refer to other files such as images, videos and audio. Relative
+paths are resolved relative to the GLSL file that declared them.
 
 Mappings are declared in a special directive that is parsed by shady. These are
 typically inserted at the top of the file. Its format is:
 ```glsl
 #pragma map <uniform name>=<loader>:<value>
+```
+
+Mappings can also be set on the command line when invoking shady by using the
+`-map` flag. The format is the same as described earlier. Mappings set on the
+command line take precedence over mappings declared in source files. There are
+no hard requirements for the `namespace` being the same as in the shader, so it
+is possible to e.g. override an image with a video. Example:
+```
+shady -i thing.glsl -ofmt x11 -g 1366x768 -f 60 -map myTexture=video:myVideo.mkv
 ```
 
 `uniform name` is the name of the sampler uniform that is inserted into the

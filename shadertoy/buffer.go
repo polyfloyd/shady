@@ -11,13 +11,13 @@ import (
 )
 
 func init() {
-	resourceBuilders["buffer"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+	resourceBuilders["buffer"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
 		match := bufferValueRe.FindStringSubmatch(m.Value)
 		if match == nil {
 			return nil, fmt.Errorf("could not parse buffer value: %q (format: %s)", m.Value, bufferValueRe)
 		}
 
-		filename := resolvePath(pwd, match[1])
+		filename := resolvePath(m.PWD, match[1])
 		width, err := strconv.ParseUint(match[2], 10, 32)
 		if err != nil {
 			return nil, err

@@ -11,12 +11,17 @@ var ppIncludeRe = regexp.MustCompile(`(?im)^#pragma\s+use\s+"([^"]+)"$`)
 
 type Source interface {
 	Contents() ([]byte, error)
+	Dir() string
 }
 
 type SourceBuf string
 
 func (s SourceBuf) Contents() ([]byte, error) {
 	return []byte(s), nil
+}
+
+func (s SourceBuf) Dir() string {
+	return "."
 }
 
 type SourceFile struct {
@@ -37,6 +42,10 @@ func (s SourceFile) Contents() ([]byte, error) {
 	}
 	defer fd.Close()
 	return ioutil.ReadAll(fd)
+}
+
+func (s SourceFile) Dir() string {
+	return filepath.Dir(s.Filename)
 }
 
 func processRecursive(filenames []string, sources []SourceFile) ([]SourceFile, error) {

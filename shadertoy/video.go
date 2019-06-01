@@ -17,8 +17,8 @@ import (
 )
 
 func init() {
-	resourceBuilders["video"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
-		r, err := newVideoTexture(m.Name, resolvePath(pwd, m.Value), *texIndexEnum, state.Time)
+	resourceBuilders["video"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+		r, err := newVideoTexture(m.Name, resolvePath(m.PWD, m.Value), *texIndexEnum, state.Time)
 		*texIndexEnum++
 		return r, err
 	}

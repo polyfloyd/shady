@@ -18,8 +18,8 @@ import (
 )
 
 func init() {
-	resourceBuilders["perip_mat4"] = func(m Mapping, pwd string, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
-		return newMat4Peripheral(m.Name, pwd, m.Value)
+	resourceBuilders["perip_mat4"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+		return newMat4Peripheral(m.Name, m.PWD, m.Value)
 	}
 }
 
