@@ -37,6 +37,20 @@ defined but not initialized.
 See also https://www.shadertoy.com/howto for info on how to write shaders for
 Shadertoy.
 
+### Including other source files
+To include another GLSL file, you may use the directive below:
+```glsl
+#pragma use "path/to/file.glsl"
+```
+This allows you to use functions and such from other GLSL files so it becomes
+possible to create libraries. There is no namespacing or generation of forward
+function declarations, it just takes a source file and dumps it in the place of
+this directive much like C does. However, it does prevent including the same
+file more than once in recursive inclusion.
+
+File paths are resolved relative to the source file that declared the include
+directive.
+
 ### Mappings
 It is possible use resources like images, videos and audio from shaders in
 this environment by using the `iChannelX` samplers. On the website, one can
