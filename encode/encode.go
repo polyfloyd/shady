@@ -220,6 +220,10 @@ func (f X11Display) Encode(w io.Writer, img image.Image) error {
 }
 
 func (f *X11Display) EncodeAnimation(w io.Writer, stream <-chan image.Image, interval time.Duration) error {
+	if interval <= 0 {
+		return fmt.Errorf("the X11 display requires a framerate to be set")
+	}
+
 	firstImage, ok := <-stream
 	if !ok {
 		return nil
