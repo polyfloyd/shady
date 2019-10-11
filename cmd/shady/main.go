@@ -24,6 +24,9 @@ import (
 	"github.com/polyfloyd/shady/renderer"
 	"github.com/polyfloyd/shady/shadertoy"
 	_ "github.com/polyfloyd/shady/shadertoy/audio"
+	_ "github.com/polyfloyd/shady/shadertoy/image"
+	_ "github.com/polyfloyd/shady/shadertoy/peripheral"
+	_ "github.com/polyfloyd/shady/shadertoy/video"
 )
 
 func main() {

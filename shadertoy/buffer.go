@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["buffer"] = func(m Mapping, genTexID GenTexFunc, _ renderer.RenderState) (Resource, error) {
+	RegisterResourceType("buffer", func(m Mapping, genTexID GenTexFunc, _ renderer.RenderState) (Resource, error) {
 		match := bufferValueRe.FindStringSubmatch(m.Value)
 		if match == nil {
 			return nil, fmt.Errorf("could not parse buffer value: %q (format: %s)", m.Value, bufferValueRe)
@@ -43,7 +43,7 @@ func init() {
 			height:   uint(height),
 			sources:  renderer.SourceFiles(sources...),
 		}, nil
-	}
+	})
 }
 
 var bufferValueRe = regexp.MustCompile(`^([^;]+);(\d+)x(\d+)$`)

@@ -1,4 +1,4 @@
-package shadertoy
+package image
 
 import (
 	"fmt"
@@ -10,10 +10,11 @@ import (
 	"github.com/go-gl/gl/v3.3-core/gl"
 
 	"github.com/polyfloyd/shady/renderer"
+	"github.com/polyfloyd/shady/shadertoy"
 )
 
 func init() {
-	resourceBuilders["builtin"] = func(m Mapping, genTexID GenTexFunc, _ renderer.RenderState) (Resource, error) {
+	shadertoy.RegisterResourceType("builtin", func(m shadertoy.Mapping, genTexID shadertoy.GenTexFunc, _ renderer.RenderState) (shadertoy.Resource, error) {
 		switch m.Value {
 		case "Back Buffer":
 			r := &backBufferImage{
@@ -30,9 +31,9 @@ func init() {
 		default:
 			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
 		}
-	}
-	resourceBuilders["image"] = func(m Mapping, genTexID GenTexFunc, _ renderer.RenderState) (Resource, error) {
-		path, err := ResolvePath(m.PWD, m.Value)
+	})
+	shadertoy.RegisterResourceType("image", func(m shadertoy.Mapping, genTexID shadertoy.GenTexFunc, _ renderer.RenderState) (shadertoy.Resource, error) {
+		path, err := shadertoy.ResolvePath(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +48,7 @@ func init() {
 		}
 		r := newImageTexture(img, m.Name, genTexID())
 		return r, nil
-	}
+	})
 }
 
 // imageTexture is a mapping of a static image texture.
@@ -107,7 +108,7 @@ func (tex *imageTexture) PreRender(state renderer.RenderState) {
 		gl.BindTexture(gl.TEXTURE_2D, tex.id)
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
-	if m := IchannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
+	if m := shadertoy.IchannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(tex.rect.Dx()), float32(tex.rect.Dy()), 1.0)
 		}
@@ -147,7 +148,7 @@ func (tex *backBufferImage) PreRender(state renderer.RenderState) {
 		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID())
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
-	if m := IchannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
+	if m := shadertoy.IchannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 1.0)
 		}

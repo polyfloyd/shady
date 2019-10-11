@@ -1,4 +1,4 @@
-package shadertoy
+package video
 
 import (
 	"context"
@@ -14,17 +14,18 @@ import (
 	"github.com/go-gl/gl/v3.3-core/gl"
 
 	"github.com/polyfloyd/shady/renderer"
+	"github.com/polyfloyd/shady/shadertoy"
 )
 
 func init() {
-	resourceBuilders["video"] = func(m Mapping, genTexID GenTexFunc, state renderer.RenderState) (Resource, error) {
-		path, err := ResolvePath(m.PWD, m.Value)
+	shadertoy.RegisterResourceType("video", func(m shadertoy.Mapping, genTexID shadertoy.GenTexFunc, state renderer.RenderState) (shadertoy.Resource, error) {
+		path, err := shadertoy.ResolvePath(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
 		}
 		r, err := newVideoTexture(m.Name, path, genTexID(), state.Time)
 		return r, err
-	}
+	})
 }
 
 type videoTexture struct {
@@ -125,7 +126,7 @@ func (vt *videoTexture) PreRender(state renderer.RenderState) {
 		)
 		gl.Uniform1i(loc.Location, int32(vt.index))
 	}
-	if m := IchannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
+	if m := shadertoy.IchannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(vt.resolution.Dx()), float32(vt.resolution.Dy()), 1.0)
 		}
@@ -133,7 +134,7 @@ func (vt *videoTexture) PreRender(state renderer.RenderState) {
 	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", vt.uniformName)]; ok {
 		gl.Uniform3f(loc.Location, float32(vt.resolution.Dx()), float32(vt.resolution.Dy()), 1.0)
 	}
-	if m := IchannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
+	if m := shadertoy.IchannelNumRe.FindStringSubmatch(vt.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
 			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 		}
