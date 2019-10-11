@@ -13,28 +13,25 @@ import (
 )
 
 func init() {
-	resourceBuilders["builtin"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (Resource, error) {
+	resourceBuilders["builtin"] = func(m Mapping, genTexID GenTexFunc, _ renderer.RenderState) (Resource, error) {
 		switch m.Value {
 		case "Back Buffer":
 			r := &backBufferImage{
 				uniformName: m.Name,
-				index:       *texIndexEnum,
+				index:       genTexID(),
 			}
-			*texIndexEnum++
 			return r, nil
 		case "RGBA Noise Small": // 64x64 4channels uint8
-			r := newImageTexture(noise(image.Rect(0, 0, 64, 64)), m.Name, *texIndexEnum)
-			*texIndexEnum++
+			r := newImageTexture(noise(image.Rect(0, 0, 64, 64)), m.Name, genTexID())
 			return r, nil
 		case "RGBA Noise Medium": // 256x256 4channels uint8
-			r := newImageTexture(noise(image.Rect(0, 0, 256, 256)), m.Name, *texIndexEnum)
-			*texIndexEnum++
+			r := newImageTexture(noise(image.Rect(0, 0, 256, 256)), m.Name, genTexID())
 			return r, nil
 		default:
 			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
 		}
 	}
-	resourceBuilders["image"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (Resource, error) {
+	resourceBuilders["image"] = func(m Mapping, genTexID GenTexFunc, _ renderer.RenderState) (Resource, error) {
 		path, err := ResolvePath(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
@@ -48,8 +45,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		r := newImageTexture(img, m.Name, *texIndexEnum)
-		*texIndexEnum++
+		r := newImageTexture(img, m.Name, genTexID())
 		return r, nil
 	}
 }
@@ -62,10 +58,10 @@ type imageTexture struct {
 	rect        image.Rectangle
 }
 
-func newImageTexture(img image.Image, uniformName string, texIndex uint32) *imageTexture {
+func newImageTexture(img image.Image, uniformName string, texID uint32) *imageTexture {
 	tex := &imageTexture{
 		uniformName: uniformName,
-		index:       texIndex,
+		index:       texID,
 		rect:        img.Bounds(),
 	}
 	gl.GenTextures(1, &tex.id)

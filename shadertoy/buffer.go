@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["buffer"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (Resource, error) {
+	resourceBuilders["buffer"] = func(m Mapping, genTexID GenTexFunc, _ renderer.RenderState) (Resource, error) {
 		match := bufferValueRe.FindStringSubmatch(m.Value)
 		if match == nil {
 			return nil, fmt.Errorf("could not parse buffer value: %q (format: %s)", m.Value, bufferValueRe)
@@ -35,11 +35,9 @@ func init() {
 			return nil, err
 		}
 
-		index := *texIndexEnum
-		*texIndexEnum++
 		return &bufferImage{
 			name:     m.Name,
-			index:    index,
+			index:    genTexID(),
 			filename: filename,
 			width:    uint(width),
 			height:   uint(height),

@@ -15,13 +15,12 @@ import (
 )
 
 func init() {
-	shadertoy.RegisterResourceType("audio", func(m shadertoy.Mapping, texIndexEnum *uint32, _ renderer.RenderState) (shadertoy.Resource, error) {
+	shadertoy.RegisterResourceType("audio", func(m shadertoy.Mapping, genTexID shadertoy.GenTexFunc, _ renderer.RenderState) (shadertoy.Resource, error) {
 		source, err := parseMappingValue(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
 		}
-		r := newAudioTexture(m.Name, source, *texIndexEnum)
-		*texIndexEnum++
+		r := newAudioTexture(m.Name, source, genTexID())
 		return r, nil
 	})
 }

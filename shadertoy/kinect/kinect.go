@@ -49,12 +49,11 @@ func init() {
 		gamma[i] = 255 - uint8(b*256)
 	}
 
-	shadertoy.RegisterResourceType("kinect", func(m shadertoy.Mapping, texIndexEnum *uint32, state renderer.RenderState) (shadertoy.Resource, error) {
-		kin, err := Open(m.Name, *texIndexEnum)
+	shadertoy.RegisterResourceType("kinect", func(m shadertoy.Mapping, genTexID shadertoy.GenTexFunc, state renderer.RenderState) (shadertoy.Resource, error) {
+		kin, err := Open(m.Name, genTexID())
 		if err != nil {
 			return nil, err
 		}
-		*texIndexEnum++
 		return kin, nil
 	})
 }

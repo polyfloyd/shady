@@ -17,13 +17,12 @@ import (
 )
 
 func init() {
-	resourceBuilders["video"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (Resource, error) {
+	resourceBuilders["video"] = func(m Mapping, genTexID GenTexFunc, state renderer.RenderState) (Resource, error) {
 		path, err := ResolvePath(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
 		}
-		r, err := newVideoTexture(m.Name, path, *texIndexEnum, state.Time)
-		*texIndexEnum++
+		r, err := newVideoTexture(m.Name, path, genTexID(), state.Time)
 		return r, err
 	}
 }

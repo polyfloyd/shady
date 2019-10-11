@@ -30,7 +30,8 @@ var texIndexEnum uint32
 // current working directory and an enumerator for texture IDs.
 var resourceBuilders = map[string]ResourceBuildFunc{}
 
-type ResourceBuildFunc func(Mapping, *uint32, renderer.RenderState) (Resource, error)
+type GenTexFunc func() uint32
+type ResourceBuildFunc func(Mapping, GenTexFunc, renderer.RenderState) (Resource, error)
 
 func RegisterResourceType(name string, fn ResourceBuildFunc) {
 	if _, ok := resourceBuilders[name]; ok {
@@ -252,7 +253,12 @@ func (m Mapping) resource(state renderer.RenderState) (Resource, error) {
 	if !ok {
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
 	}
-	return fn(m, &texIndexEnum, state)
+	genTexID := func() uint32 {
+		id := texIndexEnum
+		texIndexEnum++
+		return id
+	}
+	return fn(m, genTexID, state)
 }
 
 func ResolvePath(pwd, path string) (string, error) {
