@@ -50,7 +50,7 @@ func init() {
 	}
 
 	shadertoy.RegisterResourceType("kinect", func(m shadertoy.Mapping, genTexID shadertoy.GenTexFunc, state renderer.RenderState) (shadertoy.Resource, error) {
-		kin, err := Open(m.Name, genTexID())
+		kin, err := open(m.Name, genTexID())
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +58,7 @@ func init() {
 	})
 }
 
-type Kinect struct {
+type kinect struct {
 	ctx            *C.freenect_context
 	dev            *C.freenect_device
 	instanceHandle *struct{}
@@ -73,8 +73,8 @@ type Kinect struct {
 	textureID    uint32
 }
 
-func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
-	kin := &Kinect{
+func open(uniformName string, textureIndex uint32) (*kinect, error) {
+	kin := &kinect{
 		instanceHandle: &struct{}{},
 		closed:         make(chan struct{}),
 		loopClosed:     make(chan struct{}),
@@ -130,7 +130,7 @@ func Open(uniformName string, textureIndex uint32) (*Kinect, error) {
 	return kin, nil
 }
 
-func (kin *Kinect) Close() error {
+func (kin *kinect) Close() error {
 	close(kin.closed)
 	<-kin.loopClosed
 	instances.Delete(kin.instanceHandle)
@@ -138,7 +138,7 @@ func (kin *Kinect) Close() error {
 	return nil
 }
 
-func (kin *Kinect) UniformSource() string {
+func (kin *kinect) UniformSource() string {
 	return fmt.Sprintf(`
 		uniform sampler2D %s;
 		uniform vec3 %sSize;
@@ -146,7 +146,7 @@ func (kin *Kinect) UniformSource() string {
 	`, kin.uniformName, kin.uniformName, kin.uniformName)
 }
 
-func (kin *Kinect) PreRender(state renderer.RenderState) {
+func (kin *kinect) PreRender(state renderer.RenderState) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 
@@ -176,7 +176,7 @@ func (kin *Kinect) PreRender(state renderer.RenderState) {
 	}
 }
 
-func (kin *Kinect) freenectLoop() {
+func (kin *kinect) freenectLoop() {
 	defer close(kin.loopClosed)
 
 	tiltAngle := 15.
@@ -209,7 +209,7 @@ outer:
 	C.freenect_shutdown(kin.ctx)
 }
 
-func (kin *Kinect) rgbCallback(rgbPtr uintptr) {
+func (kin *kinect) rgbCallback(rgbPtr uintptr) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 
@@ -227,7 +227,7 @@ func (kin *Kinect) rgbCallback(rgbPtr uintptr) {
 	}
 }
 
-func (kin *Kinect) depthCallback(depthPtr uintptr) {
+func (kin *kinect) depthCallback(depthPtr uintptr) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 

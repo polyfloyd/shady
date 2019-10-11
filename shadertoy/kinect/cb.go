@@ -11,7 +11,7 @@ func rgbCallbackGo(dev *C.freenect_device, rgbPtr uintptr, timestamp C.uint32_t)
 	if !ok {
 		panic(fmt.Errorf("kinect: instance not found, handle=%v", instanceHandle))
 	}
-	kin := h.(*Kinect)
+	kin := h.(*kinect)
 	kin.rgbCallback(rgbPtr)
 }
 
@@ -22,6 +22,6 @@ func depthCallbackGo(dev *C.freenect_device, depthPtr uintptr, timestamp C.uint3
 	if !ok {
 		panic(fmt.Errorf("kinect: instance not found, handle=%v", instanceHandle))
 	}
-	kin := h.(*Kinect)
+	kin := h.(*kinect)
 	kin.depthCallback(depthPtr)
 }

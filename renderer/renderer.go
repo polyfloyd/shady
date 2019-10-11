@@ -295,7 +295,7 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 		select {
 		case <-ctx.Done():
 			return
-		case stream <- &Flip{Image: img}:
+		case stream <- &flip{Image: img}:
 		}
 	}
 }
@@ -317,12 +317,12 @@ func (sh *Shader) Close() error {
 	return envErr
 }
 
-// Flip wraps an image and flips it upside down.
-type Flip struct {
+// flip wraps an image and flips it upside down.
+type flip struct {
 	image.Image
 }
 
-func (flip *Flip) At(x, y int) color.Color {
+func (flip *flip) At(x, y int) color.Color {
 	h := flip.Bounds().Dy()
 	return flip.Image.At(x, h-y-1)
 }
