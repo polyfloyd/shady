@@ -50,6 +50,8 @@ func main() {
 	realtime := flag.Bool("rt", false, "Render at the actual number of frames per second set by -framerate")
 	verbose := flag.Bool("v", false, "Show verbose output about rendering")
 	watch := flag.Bool("w", false, "Watch the shader source files for changes")
+	glslVersion := flag.String("glsl", "330", "The GLSL version to use")
+	openGLVersionStr := flag.String("opengl", "glsl", "The OpenGL version to use. If \"glsl\", the version is inferred from the requested GLSL version")
 	var shadertoyMappings arrayFlags
 	flag.Var(&shadertoyMappings, "map", "Specify or override ShaderToy input mappings")
 	flag.Parse()
@@ -142,7 +144,24 @@ func main() {
 		cancel()
 	}()
 
-	sh, err := renderer.NewShader(width, height)
+	var openGLVersion renderer.OpenGLVersion
+	if *openGLVersionStr == "glsl" {
+		openGLVersion, err = renderer.OpenGLVersionFromGLSLVersion(*glslVersion)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		openGLVersion, err = renderer.ParseOpenGLVersion(*openGLVersionStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	if *verbose {
+		log.Printf("OpenGL version: %s", openGLVersion)
+		log.Printf("GLSL version: %s", *glslVersion)
+	}
+
+	sh, err := renderer.NewShader(width, height, openGLVersion)
 	if err != nil {
 		log.Fatalf("Could initialize OpenGL: %v", err)
 	}
@@ -184,6 +203,7 @@ func main() {
 			env := &shadertoy.ShaderToy{
 				ShaderSources: sources,
 				Mappings:      mappings,
+				GLSLVersion:   *glslVersion,
 			}
 			return env, watcher, nil
 		}()

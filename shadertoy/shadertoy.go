@@ -33,13 +33,12 @@ var resourceBuilders = map[string]func(Mapping, *uint32, renderer.RenderState) (
 type ShaderToy struct {
 	ShaderSources []renderer.SourceFile
 	Mappings      []Mapping
+	GLSLVersion   string
 
 	resources []resource
 }
 
 func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
-	glslVersion := "140"
-
 	return map[renderer.Stage][]renderer.Source{
 		renderer.StageVertex: {renderer.SourceBuf(fmt.Sprintf(`
 			#version %s
@@ -47,7 +46,7 @@ func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
 			void main(void) {
 				gl_Position = vec4(vert, 1.0);
 			}
-		`, glslVersion))},
+		`, st.GLSLVersion))},
 		renderer.StageFragment: func() []renderer.Source {
 			ss := []renderer.Source{}
 			ss = append(ss, renderer.SourceBuf(fmt.Sprintf(`
@@ -61,7 +60,7 @@ func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
 				uniform vec4 iDate;
 				uniform float iSampleRate;
 				uniform vec3 iChannelResolution[4];
-			`, glslVersion)))
+			`, st.GLSLVersion)))
 			for _, res := range st.resources {
 				ss = append(ss, renderer.SourceBuf(res.UniformSource()))
 			}

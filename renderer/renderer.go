@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,10 +18,20 @@ import (
 	"github.com/polyfloyd/shady/egl"
 )
 
+const (
+	OpenGL20 OpenGLVersion = 20
+	OpenGL21 OpenGLVersion = 21
+	OpenGL30 OpenGLVersion = 30
+	OpenGL31 OpenGLVersion = 31
+	OpenGL32 OpenGLVersion = 32
+	OpenGL33 OpenGLVersion = 33
+)
+
 var initGLOnce sync.Once
 
 type Shader struct {
-	w, h uint
+	w, h      uint
+	glVersion OpenGLVersion
 
 	vertLoc uint32
 	vao     uint32
@@ -39,7 +51,7 @@ type Shader struct {
 	prevFrameHandle interface{}
 }
 
-func initGL() error {
+func initGL(glVersion OpenGLVersion) error {
 	// Set up a rendering context.
 	display, err := egl.GetDisplay(egl.DefaultDisplay)
 	if err != nil {
@@ -52,7 +64,8 @@ func initGL() error {
 	if err := display.BindAPI(egl.OpenGLAPI); err != nil {
 		return err
 	}
-	glContext, err := display.CreateContext(surface, 3, 3)
+	glMajor, glMinor := glVersion.majorMinor()
+	glContext, err := display.CreateContext(surface, glMajor, glMinor)
 	if err != nil {
 		return err
 	}
@@ -74,24 +87,25 @@ func initGL() error {
 	return nil
 }
 
-func NewShader(width, height uint) (*Shader, error) {
+func NewShader(width, height uint, glVersion OpenGLVersion) (*Shader, error) {
 	// Hack: Unit tests require a different style of initialization. We'll
 	// detect whether we are running as a test for now.
 	var err error
 	if strings.HasSuffix(os.Args[0], ".test") {
-		err = initGL()
+		err = initGL(glVersion)
 	} else {
-		initGLOnce.Do(func() { err = initGL() })
+		initGLOnce.Do(func() { err = initGL(glVersion) })
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	sh := &Shader{
-		w:        width,
-		h:        height,
-		renderer: &pboRenderer{w: width, h: height},
-		newEnvs:  make(chan Environment, 1),
+		w:         width,
+		h:         height,
+		glVersion: glVersion,
+		renderer:  &pboRenderer{w: width, h: height},
+		newEnvs:   make(chan Environment, 1),
 	}
 
 	// Set up the render targets.
@@ -162,7 +176,7 @@ func (sh *Shader) reloadEnvironment(ctx context.Context) error {
 
 	sh.subTargets = map[string]*Shader{}
 	for name, env := range env.SubEnvironments() {
-		s, err := NewShader(env.Width, env.Height)
+		s, err := NewShader(env.Width, env.Height, sh.glVersion)
 		if err != nil {
 			return err
 		}
@@ -409,4 +423,51 @@ func (pr *pboRenderer) Close() error {
 		gl.DeleteBuffers(1, &t.pbo)
 	}
 	return nil
+}
+
+type OpenGLVersion int
+
+func ParseOpenGLVersion(s string) (OpenGLVersion, error) {
+	re := regexp.MustCompile(`^(\d)\.(\d)$`)
+	m := re.FindStringSubmatch(s)
+	if m == nil {
+		return 0, fmt.Errorf("invalid OpenGL version: %q", s)
+	}
+	maj, _ := strconv.Atoi(m[1])
+	min, _ := strconv.Atoi(m[2])
+	return OpenGLVersion(maj*10 + min), nil
+}
+
+func OpenGLVersionFromGLSLVersion(s string) (OpenGLVersion, error) {
+	// Parse to int first, this verifies the format of the string.
+	glslVersion, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+
+	switch s {
+	case "110":
+		return OpenGL20, nil
+	case "120":
+		return OpenGL21, nil
+	case "130":
+		return OpenGL30, nil
+	case "140":
+		return OpenGL31, nil
+	case "150":
+		return OpenGL32, nil
+	}
+
+	// For all versions of OpenGL 3.3 and above, the corresponding GLSL version
+	// matches the OpenGL version. So GL 4.1 uses GLSL 4.10.
+	return OpenGLVersion(glslVersion / 10), nil
+}
+
+func (v OpenGLVersion) String() string {
+	maj, min := v.majorMinor()
+	return fmt.Sprintf("%d.%d", maj, min)
+}
+
+func (v OpenGLVersion) majorMinor() (int, int) {
+	return int(v / 10), int(v % 10)
 }
