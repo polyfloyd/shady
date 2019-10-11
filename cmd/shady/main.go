@@ -201,10 +201,13 @@ func main() {
 				}
 				mappings = append(mappings, m)
 			}
-			env := &shadertoy.ShaderToy{
-				ShaderSources: renderer.SourceFiles(sources...),
-				Mappings:      mappings,
-				GLSLVersion:   *glslVersion,
+			env, err := shadertoy.NewShaderToy(
+				renderer.SourceFiles(sources...),
+				mappings,
+				*glslVersion,
+			)
+			if err != nil {
+				return nil, watcher, err
 			}
 			return env, watcher, nil
 		}()

@@ -174,8 +174,12 @@ func (sh *Shader) reloadEnvironment(ctx context.Context) error {
 		return fmt.Errorf("error setting up environment: %v", err)
 	}
 
+	subEnvs, err := env.SubEnvironments()
+	if err != nil {
+		return err
+	}
 	sh.subTargets = map[string]*Shader{}
-	for name, env := range env.SubEnvironments() {
+	for name, env := range subEnvs {
 		s, err := NewShader(env.Width, env.Height, sh.glVersion)
 		if err != nil {
 			return err

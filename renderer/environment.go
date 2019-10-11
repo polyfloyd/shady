@@ -94,7 +94,7 @@ type Environment interface {
 	//
 	// The implementing environment is not required to retain any state of the
 	// environments returned.
-	SubEnvironments() map[string]SubEnvironment
+	SubEnvironments() (map[string]SubEnvironment, error)
 
 	// PreRender updates the program's uniform values for each next frame.
 	//

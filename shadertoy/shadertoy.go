@@ -42,11 +42,30 @@ func RegisterResourceType(name string, fn ResourceBuildFunc) {
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
 type ShaderToy struct {
-	ShaderSources []renderer.SourceFile
-	Mappings      []Mapping
-	GLSLVersion   string
+	shaderSources []renderer.SourceFile
+	mappings      []Mapping
+	glslVersion   string
 
 	resources []Resource
+}
+
+func NewShaderToy(
+	shaderSources []renderer.SourceFile,
+	overrideMappings []Mapping,
+	glslVersion string,
+) (*ShaderToy, error) {
+	sourceMappings, err := extractMappings(shaderSources)
+	if err != nil {
+		return nil, err
+	}
+	mappings := deduplicateMappings(append(overrideMappings, sourceMappings...)...)
+
+	return &ShaderToy{
+		shaderSources: shaderSources,
+		mappings:      mappings,
+		glslVersion:   glslVersion,
+		// resources is populated by Setup().
+	}, nil
 }
 
 func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
@@ -57,7 +76,7 @@ func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
 			void main(void) {
 				gl_Position = vec4(vert, 1.0);
 			}
-		`, st.GLSLVersion))},
+		`, st.glslVersion))},
 		renderer.StageFragment: func() []renderer.Source {
 			ss := []renderer.Source{}
 			ss = append(ss, renderer.SourceBuf(fmt.Sprintf(`
@@ -71,11 +90,11 @@ func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
 				uniform vec4 iDate;
 				uniform float iSampleRate;
 				uniform vec3 iChannelResolution[4];
-			`, st.GLSLVersion)))
+			`, st.glslVersion)))
 			for _, res := range st.resources {
 				ss = append(ss, renderer.SourceBuf(res.UniformSource()))
 			}
-			for _, s := range st.ShaderSources {
+			for _, s := range st.shaderSources {
 				ss = append(ss, s)
 			}
 			ss = append(ss, renderer.SourceBuf(`
@@ -89,17 +108,10 @@ func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
 }
 
 func (st *ShaderToy) Setup(state renderer.RenderState) error {
-	ss := make([]renderer.Source, 0, len(st.ShaderSources))
-	for _, s := range st.ShaderSources {
-		ss = append(ss, s)
+	if st.resources != nil {
+		return fmt.Errorf("double call to ShaderToy.Setup")
 	}
-	mappings, err := extractMappings(ss)
-	if err != nil {
-		return err
-	}
-	mappings = deduplicateMappings(append(st.Mappings, mappings...)...)
-
-	for _, mapping := range mappings {
+	for _, mapping := range st.mappings {
 		res, err := mapping.resource(state)
 		if err != nil {
 			return err
@@ -111,12 +123,13 @@ func (st *ShaderToy) Setup(state renderer.RenderState) error {
 	return nil
 }
 
-func (st ShaderToy) SubEnvironments() map[string]renderer.SubEnvironment {
+func (st ShaderToy) SubEnvironments() (map[string]renderer.SubEnvironment, error) {
 	envs := map[string]renderer.SubEnvironment{}
 	for _, res := range st.resources {
 		if bi, ok := res.(*bufferImage); ok {
-			env := &ShaderToy{
-				ShaderSources: bi.sources,
+			env, err := NewShaderToy(bi.sources, nil, st.glslVersion)
+			if err != nil {
+				return nil, err
 			}
 			envs[bi.name] = renderer.SubEnvironment{
 				Environment: env,
@@ -125,7 +138,7 @@ func (st ShaderToy) SubEnvironments() map[string]renderer.SubEnvironment {
 			}
 		}
 	}
-	return envs
+	return envs, nil
 }
 
 func (st ShaderToy) PreRender(state renderer.RenderState) {
@@ -198,7 +211,7 @@ func ParseMapping(str, pwd string) (Mapping, error) {
 	return Mapping{}, fmt.Errorf("unable to parse mapping from %q", str)
 }
 
-func extractMappings(shaderSources []renderer.Source) ([]Mapping, error) {
+func extractMappings(shaderSources []renderer.SourceFile) ([]Mapping, error) {
 	mappings := []Mapping{}
 	for _, s := range shaderSources {
 		src, err := s.Contents()
@@ -226,7 +239,6 @@ func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	var outMappings []Mapping
 	set := map[string]bool{}
 	for _, m := range inMappings {
-		// Deduplicate by using map keys.
 		if !set[m.Name] {
 			set[m.Name] = true
 			outMappings = append(outMappings, m)
