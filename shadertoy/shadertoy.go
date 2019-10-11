@@ -2,8 +2,6 @@ package shadertoy
 
 import (
 	"fmt"
-	_ "image/jpeg"
-	_ "image/png"
 	"regexp"
 	"strings"
 	"time"
