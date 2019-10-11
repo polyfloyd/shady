@@ -9,21 +9,32 @@ import (
 
 var ppIncludeRe = regexp.MustCompile(`(?im)^#pragma\s+use\s+"([^"]+)"$`)
 
+// Source represents a single source file.
 type Source interface {
+	// Contents reads the contents of the source file.
 	Contents() ([]byte, error)
+	// Dir returns the parent directory the file is located in.
 	Dir() string
 }
 
+// SourceBuf is an implementation of the Source interface that keeps its
+// contents in memory.
 type SourceBuf string
 
+// Contents implemetns the Source interface.
 func (s SourceBuf) Contents() ([]byte, error) {
 	return []byte(s), nil
 }
 
+// Dir implemetns the Source interface.
+//
+// A Sourcebuf has no parent directory, so the current working directory is
+// returned instead.
 func (s SourceBuf) Dir() string {
 	return "."
 }
 
+// SourceFile is an implementation of the Source interface for real files.
 type SourceFile struct {
 	Filename string
 }
@@ -35,6 +46,7 @@ func Includes(filenames ...string) ([]SourceFile, error) {
 	return processRecursive(filenames, []SourceFile{})
 }
 
+// Contents implemetns the Source interface.
 func (s SourceFile) Contents() ([]byte, error) {
 	fd, err := os.Open(s.Filename)
 	if err != nil {
@@ -44,6 +56,7 @@ func (s SourceFile) Contents() ([]byte, error) {
 	return ioutil.ReadAll(fd)
 }
 
+// Dir implemetns the Source interface.
 func (s SourceFile) Dir() string {
 	return filepath.Dir(s.Filename)
 }
