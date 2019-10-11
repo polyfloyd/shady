@@ -26,13 +26,13 @@ import (
 	"log"
 	"math"
 	"reflect"
-	"regexp"
 	"sync"
 	"unsafe"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 
 	"github.com/polyfloyd/shady/renderer"
+	"github.com/polyfloyd/shady/shadertoy"
 )
 
 var (
@@ -42,15 +42,21 @@ var (
 
 var instances sync.Map
 
-// TODO: duplicate
-var ichannelNumRe = regexp.MustCompile(`^iChannel(\d+)$`)
-
 func init() {
 	for i := range gamma {
 		a := float64(i) / float64(len(gamma))
 		b := math.Pow(a, 3) * 6
 		gamma[i] = 255 - uint8(b*256)
 	}
+
+	shadertoy.RegisterResourceType("kinect", func(m shadertoy.Mapping, texIndexEnum *uint32, state renderer.RenderState) (shadertoy.Resource, error) {
+		kin, err := Open(m.Name, *texIndexEnum)
+		if err != nil {
+			return nil, err
+		}
+		*texIndexEnum++
+		return kin, nil
+	})
 }
 
 type Kinect struct {
@@ -161,7 +167,7 @@ func (kin *Kinect) PreRender(state renderer.RenderState) {
 		)
 		gl.Uniform1i(loc.Location, int32(kin.textureIndex))
 	}
-	if m := ichannelNumRe.FindStringSubmatch(kin.uniformName); m != nil {
+	if m := shadertoy.IchannelNumRe.FindStringSubmatch(kin.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(resolution.Dx()), float32(resolution.Dy()), 1.0)
 		}
