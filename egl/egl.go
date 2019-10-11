@@ -36,7 +36,7 @@ func GetDisplay(dtype NativeDisplayType) (Display, error) {
 	return Display{dpy: dpy}, nil
 }
 
-// Extensions retrieves a list of supported client APIs.
+// ClientAPIs retrieves a list of supported client APIs.
 func (d Display) ClientAPIs() []string {
 	str := C.GoString(C.eglQueryString(d.dpy, C.EGL_CLIENT_APIS))
 	return strings.Split(strings.Trim(str, " "), " ")
