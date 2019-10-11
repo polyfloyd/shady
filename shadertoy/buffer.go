@@ -43,7 +43,7 @@ func init() {
 			filename: filename,
 			width:    uint(width),
 			height:   uint(height),
-			sources:  sources,
+			sources:  renderer.SourceFiles(sources...),
 		}, nil
 	}
 }

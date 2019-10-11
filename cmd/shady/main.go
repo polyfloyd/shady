@@ -188,7 +188,7 @@ func main() {
 				return nil, watcher, err
 			}
 			for _, src := range sources {
-				if err := watcher.Add(src.Filename); err != nil {
+				if err := watcher.Add(src); err != nil {
 					log.Print(err)
 				}
 			}
@@ -202,7 +202,7 @@ func main() {
 				mappings = append(mappings, m)
 			}
 			env := &shadertoy.ShaderToy{
-				ShaderSources: sources,
+				ShaderSources: renderer.SourceFiles(sources...),
 				Mappings:      mappings,
 				GLSLVersion:   *glslVersion,
 			}

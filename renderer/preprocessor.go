@@ -2,73 +2,27 @@ package renderer
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"regexp"
 )
 
 var ppIncludeRe = regexp.MustCompile(`(?im)^#pragma\s+use\s+"([^"]+)"$`)
 
-// Source represents a single source file.
-type Source interface {
-	// Contents reads the contents of the source file.
-	Contents() ([]byte, error)
-	// Dir returns the parent directory the file is located in.
-	Dir() string
-}
-
-// SourceBuf is an implementation of the Source interface that keeps its
-// contents in memory.
-type SourceBuf string
-
-// Contents implemetns the Source interface.
-func (s SourceBuf) Contents() ([]byte, error) {
-	return []byte(s), nil
-}
-
-// Dir implemetns the Source interface.
-//
-// A Sourcebuf has no parent directory, so the current working directory is
-// returned instead.
-func (s SourceBuf) Dir() string {
-	return "."
-}
-
-// SourceFile is an implementation of the Source interface for real files.
-type SourceFile struct {
-	Filename string
-}
-
 // Includes recursively resolves dependencies in the specified file.
 //
 // The argument file is returned included in the returned list of files.
-func Includes(filenames ...string) ([]SourceFile, error) {
-	return processRecursive(filenames, []SourceFile{})
+func Includes(filenames ...string) ([]string, error) {
+	return processRecursive(filenames, []string{})
 }
 
-// Contents implemetns the Source interface.
-func (s SourceFile) Contents() ([]byte, error) {
-	fd, err := os.Open(s.Filename)
-	if err != nil {
-		return nil, err
-	}
-	defer fd.Close()
-	return ioutil.ReadAll(fd)
-}
-
-// Dir implemetns the Source interface.
-func (s SourceFile) Dir() string {
-	return filepath.Dir(s.Filename)
-}
-
-func processRecursive(filenames []string, sources []SourceFile) ([]SourceFile, error) {
+func processRecursive(filenames []string, sources []string) ([]string, error) {
 	for _, filename := range filenames {
 		absFilename, err := filepath.Abs(filename)
 		if err != nil {
 			return nil, err
 		}
-		currentFile := SourceFile{Filename: absFilename}
-		shaderSource, err := currentFile.Contents()
+		currentFile := absFilename
+		shaderSource, err := ioutil.ReadFile(currentFile)
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +49,7 @@ func processRecursive(filenames []string, sources []SourceFile) ([]SourceFile, e
 			// Check whether we have already included the referred file. This stops
 			// infinite recursions.
 			for _, inc := range checkset {
-				if inc.Filename == includedFile {
+				if inc == includedFile {
 					continue outer
 				}
 			}
