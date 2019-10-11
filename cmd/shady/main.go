@@ -18,7 +18,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/polyfloyd/shady/encode"
-	"github.com/polyfloyd/shady/glslsandbox"
 	"github.com/polyfloyd/shady/renderer"
 	"github.com/polyfloyd/shady/shadertoy"
 )
@@ -38,7 +37,6 @@ func main() {
 	flag.Var(&inputFiles, "i", "The shader file(s) to use")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
-	envName := flag.String("env", "", "The environment (aka website) to simulate. Valid values are \"glslsandbox\", \"shadertoy\" or \"\" to autodetect")
 	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
 	framerate := flag.Float64("f", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("n", 0, "Limit the number of frames in the animation. No limit is set by default")
@@ -168,44 +166,18 @@ func main() {
 				watcher.Add(src.Filename)
 			}
 
-			if *envName == "" {
-				for i := 0; *envName == "" && i < len(sources); i++ {
-					src, err := sources[i].Contents()
-					if err != nil {
-						return nil, watcher, err
-					}
-					*envName = renderer.DetectEnvironment(string(src))
+			mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
+			for _, str := range shadertoyMappings {
+				m, err := shadertoy.ParseMapping(str, ".")
+				if err != nil {
+					return nil, watcher, err
 				}
-				if *envName == "" {
-					return nil, watcher, fmt.Errorf("Unable to detect the environment to use. Please set it using -env")
-				}
+				mappings = append(mappings, m)
 			}
-
-			var env renderer.Environment
-			switch *envName {
-			case "glslsandbox":
-				ss := make([]renderer.Source, 0, len(sources))
-				for _, s := range sources {
-					ss = append(ss, s)
-				}
-				env = glslsandbox.GLSLSandbox{ShaderSources: ss}
-			case "shadertoy":
-				mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
-				for _, str := range shadertoyMappings {
-					m, err := shadertoy.ParseMapping(str, ".")
-					if err != nil {
-						return nil, watcher, err
-					}
-					mappings = append(mappings, m)
-				}
-				env = &shadertoy.ShaderToy{
-					ShaderSources: sources,
-					Mappings:      mappings,
-				}
-			default:
-				return nil, watcher, fmt.Errorf("Unknown environment: %q", *envName)
+			env := &shadertoy.ShaderToy{
+				ShaderSources: sources,
+				Mappings:      mappings,
 			}
-
 			return env, watcher, nil
 		}()
 		if err != nil {

@@ -13,18 +13,6 @@ import (
 	"github.com/polyfloyd/shady/renderer"
 )
 
-func init() {
-	renderer.RegisterEnvironmentDetector(func(shaderSource string) string {
-		// The mainImage function should always be present in ShaderToy image
-		// shaders.
-		reShaderToy := regexp.MustCompile(`void\s+mainImage\s*\(\s*out\s+vec4\s+\w+\s*,\s*(?:in)?\s+vec2\s+\w+\s*\)`)
-		if reShaderToy.MatchString(shaderSource) {
-			return "shadertoy"
-		}
-		return ""
-	})
-}
-
 // Wtf, this is not defined by go-gl?
 const glLUMINANCE = 0x1909
 
