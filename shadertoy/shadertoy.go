@@ -13,9 +13,6 @@ import (
 	"github.com/polyfloyd/shady/renderer"
 )
 
-// Wtf, this is not defined by go-gl?
-const glLUMINANCE = 0x1909
-
 var (
 	inputMappingSourceRe = regexp.MustCompile(`(?m)^#pragma\s+map\s+(\w+)=([^:]+):(.+)$`)
 	inputMappingRe       = regexp.MustCompile(`^(\w+)=([^:]+):(.+)$`)
@@ -43,11 +40,6 @@ type ShaderToy struct {
 }
 
 func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
-	ss := make([]renderer.Source, 0, len(st.ShaderSources))
-	for _, s := range st.ShaderSources {
-		ss = append(ss, s)
-	}
-
 	glslVersion := "140"
 
 	return map[renderer.Stage][]renderer.Source{

@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"io"
 	"io/ioutil"
+	"log"
 	"os/exec"
 	"time"
 )
@@ -197,7 +198,9 @@ func (f *AnsiDisplay) EncodeAnimation(w io.Writer, stream <-chan image.Image, in
 			// Reset to the default background color and jump to the next line.
 			fmt.Fprintf(&buf, "\x1b[0m\n")
 		}
-		io.Copy(w, &buf)
+		if _, err := io.Copy(w, &buf); err != nil {
+			return err
+		}
 
 		time.Sleep(interval - time.Since(lastFrame))
 		lastFrame = time.Now()
@@ -247,7 +250,11 @@ func (f *X11Display) EncodeAnimation(w io.Writer, stream <-chan image.Image, int
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	defer cmd.Wait()
+	defer func() {
+		if err := cmd.Wait(); err != nil {
+			log.Print(err)
+		}
+	}()
 
 	ofmt := RGB24Format{}
 	if err := ofmt.Encode(ffIn, firstImage); err != nil {

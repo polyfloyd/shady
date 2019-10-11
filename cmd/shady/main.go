@@ -158,12 +158,16 @@ func main() {
 			sources, err := renderer.Includes([]string(inputFiles)...)
 			if err != nil {
 				for _, src := range inputFiles {
-					watcher.Add(src)
+					if err := watcher.Add(src); err != nil {
+						log.Print(err)
+					}
 				}
 				return nil, watcher, err
 			}
 			for _, src := range sources {
-				watcher.Add(src.Filename)
+				if err := watcher.Add(src.Filename); err != nil {
+					log.Print(err)
+				}
 			}
 
 			mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))

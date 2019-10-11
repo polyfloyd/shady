@@ -3,6 +3,7 @@ package shadertoy
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -16,14 +17,14 @@ import (
 )
 
 func init() {
-	resourceBuilders["audio"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+	resourceBuilders["audio"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
 		source, err := parseMappingValue(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
 		}
-		r, err := newAudioTexture(m.Name, source, *texIndexEnum)
+		r := newAudioTexture(m.Name, source, *texIndexEnum)
 		*texIndexEnum++
-		return r, err
+		return r, nil
 	}
 }
 
@@ -50,10 +51,7 @@ func (f format) Bits() int {
 
 func parseMappingValue(pwd, value string) (audioSource, error) {
 	if match := audioGenericValueRe.FindStringSubmatch(value); match != nil {
-		channels, samplerate, ft, pcmStream, err := decodeAudioFile(match[1])
-		if err != nil {
-			return nil, err
-		}
+		channels, samplerate, ft, pcmStream := decodeAudioFile(match[1])
 		return &rawSource{
 			file:       pcmStream,
 			sampleRate: samplerate,
@@ -102,7 +100,7 @@ type audioTexture struct {
 	prevPeriod []float64
 }
 
-func newAudioTexture(uniformName string, source audioSource, texIndex uint32) (*audioTexture, error) {
+func newAudioTexture(uniformName string, source audioSource, texIndex uint32) *audioTexture {
 	at := &audioTexture{
 		uniformName: uniformName,
 		index:       texIndex,
@@ -128,7 +126,7 @@ func newAudioTexture(uniformName string, source audioSource, texIndex uint32) (*
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-	return at, nil
+	return at
 }
 
 func (at *audioTexture) UniformSource() string {
@@ -245,7 +243,7 @@ func (s *rawSource) ReadSamples(period time.Duration) []float64 {
 	return samples
 }
 
-func decodeAudioFile(filename string) (channels, samplerate int, ft format, stream io.Reader, err error) {
+func decodeAudioFile(filename string) (channels, samplerate int, ft format, stream io.Reader) {
 	// TODO: Close ffmpeg
 	r, w := io.Pipe()
 	go func() {
@@ -260,10 +258,12 @@ func decodeAudioFile(filename string) (channels, samplerate int, ft format, stre
 		)
 		cmd.Stdout = w
 		if err := cmd.Run(); err != nil {
-			w.CloseWithError(err)
+			if err := w.CloseWithError(err); err != nil {
+				log.Print(err)
+			}
 			return
 		}
 		w.Close()
 	}()
-	return 1, 22000, "s16le", r, nil
+	return 1, 22000, "s16le", r
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["buffer"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+	resourceBuilders["buffer"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
 		match := bufferValueRe.FindStringSubmatch(m.Value)
 		if match == nil {
 			return nil, fmt.Errorf("could not parse buffer value: %q (format: %s)", m.Value, bufferValueRe)

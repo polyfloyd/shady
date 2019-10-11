@@ -19,7 +19,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["builtin"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+	resourceBuilders["builtin"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
 		switch m.Value {
 		case "Back Buffer":
 			r := &backBufferImage{
@@ -29,18 +29,18 @@ func init() {
 			*texIndexEnum++
 			return r, nil
 		case "RGBA Noise Small": // 64x64 4channels uint8
-			r, err := newImageTexture(noise(image.Rect(0, 0, 64, 64)), m.Name, *texIndexEnum)
+			r := newImageTexture(noise(image.Rect(0, 0, 64, 64)), m.Name, *texIndexEnum)
 			*texIndexEnum++
-			return r, err
+			return r, nil
 		case "RGBA Noise Medium": // 256x256 4channels uint8
-			r, err := newImageTexture(noise(image.Rect(0, 0, 256, 256)), m.Name, *texIndexEnum)
+			r := newImageTexture(noise(image.Rect(0, 0, 256, 256)), m.Name, *texIndexEnum)
 			*texIndexEnum++
-			return r, err
+			return r, nil
 		default:
 			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
 		}
 	}
-	resourceBuilders["image"] = func(m Mapping, texIndexEnum *uint32, state renderer.RenderState) (resource, error) {
+	resourceBuilders["image"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
 		fd, err := os.Open(resolvePath(m.PWD, m.Value))
 		if err != nil {
 			return nil, err
@@ -50,9 +50,9 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		r, err := newImageTexture(img, m.Name, *texIndexEnum)
+		r := newImageTexture(img, m.Name, *texIndexEnum)
 		*texIndexEnum++
-		return r, err
+		return r, nil
 	}
 }
 
@@ -64,7 +64,7 @@ type imageTexture struct {
 	rect        image.Rectangle
 }
 
-func newImageTexture(img image.Image, uniformName string, texIndex uint32) (*imageTexture, error) {
+func newImageTexture(img image.Image, uniformName string, texIndex uint32) *imageTexture {
 	tex := &imageTexture{
 		uniformName: uniformName,
 		index:       texIndex,
@@ -97,7 +97,7 @@ func newImageTexture(img image.Image, uniformName string, texIndex uint32) (*ima
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
 	gl.BindTexture(gl.TEXTURE_2D, 0)
-	return tex, nil
+	return tex
 }
 
 func (tex *imageTexture) UniformSource() string {

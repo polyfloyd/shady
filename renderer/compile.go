@@ -161,8 +161,6 @@ func (err CompileError) markers() []errorMarker {
 }
 
 type LinkError struct {
-	sources map[Stage][]Source
-
 	log string
 }
 
