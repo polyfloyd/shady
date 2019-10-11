@@ -11,13 +11,16 @@ import (
 )
 
 func init() {
-	resourceBuilders["buffer"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
+	resourceBuilders["buffer"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (Resource, error) {
 		match := bufferValueRe.FindStringSubmatch(m.Value)
 		if match == nil {
 			return nil, fmt.Errorf("could not parse buffer value: %q (format: %s)", m.Value, bufferValueRe)
 		}
 
-		filename := resolvePath(m.PWD, match[1])
+		filename, err := ResolvePath(m.PWD, match[1])
+		if err != nil {
+			return nil, err
+		}
 		width, err := strconv.ParseUint(match[2], 10, 32)
 		if err != nil {
 			return nil, err
@@ -69,7 +72,7 @@ func (tex *bufferImage) PreRender(state renderer.RenderState) {
 		gl.BindTexture(gl.TEXTURE_2D, state.SubBuffers[tex.name])
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
-	if m := ichannelNumRe.FindStringSubmatch(tex.name); m != nil {
+	if m := IchannelNumRe.FindStringSubmatch(tex.name); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(tex.width), float32(tex.height), 1.0)
 		}

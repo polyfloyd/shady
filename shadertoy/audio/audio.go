@@ -1,11 +1,8 @@
-package shadertoy
+package audio
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"time"
@@ -14,10 +11,11 @@ import (
 	"github.com/mjibson/go-dsp/fft"
 
 	"github.com/polyfloyd/shady/renderer"
+	"github.com/polyfloyd/shady/shadertoy"
 )
 
 func init() {
-	resourceBuilders["audio"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
+	shadertoy.RegisterResourceType("audio", func(m shadertoy.Mapping, texIndexEnum *uint32, _ renderer.RenderState) (shadertoy.Resource, error) {
 		source, err := parseMappingValue(m.PWD, m.Value)
 		if err != nil {
 			return nil, err
@@ -25,7 +23,7 @@ func init() {
 		r := newAudioTexture(m.Name, source, *texIndexEnum)
 		*texIndexEnum++
 		return r, nil
-	}
+	})
 }
 
 const audioTexWidth = 512
@@ -64,7 +62,10 @@ func parseMappingValue(pwd, value string) (audioSource, error) {
 	if match == nil {
 		return nil, fmt.Errorf("could not parse audio value: %q (format: %s)", value, audioPCMValueRe)
 	}
-	filename := resolvePath(pwd, match[1])
+	filename, err := shadertoy.ResolvePath(pwd, match[1])
+	if err != nil {
+		return nil, err
+	}
 	samplerate, err := strconv.Atoi(match[2])
 	if err != nil {
 		return nil, err
@@ -179,7 +180,7 @@ func (at *audioTexture) PreRender(state renderer.RenderState) {
 		)
 		gl.Uniform1i(loc.Location, int32(at.index))
 	}
-	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
+	if m := shadertoy.IchannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
 		}
@@ -187,7 +188,7 @@ func (at *audioTexture) PreRender(state renderer.RenderState) {
 	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", at.uniformName)]; ok {
 		gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
 	}
-	if m := ichannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
+	if m := shadertoy.IchannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
 			gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 		}
@@ -203,67 +204,4 @@ func (at *audioTexture) PreRender(state renderer.RenderState) {
 func (at *audioTexture) Close() error {
 	gl.DeleteTextures(1, &at.id)
 	return nil
-}
-
-type audioSource interface {
-	SampleRate() float32
-	ReadSamples(period time.Duration) []float64
-}
-
-type rawSource struct {
-	file                 io.Reader
-	sampleRate, channels int
-	format               format
-}
-
-func (s rawSource) SampleRate() float32 {
-	return float32(s.sampleRate)
-}
-
-func (s *rawSource) ReadSamples(period time.Duration) []float64 {
-	numBytes := s.format.Bits() / 8
-	buf := make([]byte, s.sampleRate*s.channels*int(period)/int(time.Second)*numBytes)
-	n, err := io.ReadAtLeast(s.file, buf, len(buf))
-	if err != nil {
-		return make([]float64, time.Duration(s.sampleRate)*period/time.Second)
-	}
-
-	samples := make([]float64, n/numBytes)
-	switch s.format {
-	case "s16le":
-		for i := range samples {
-			offset := i * s.channels * numBytes
-			bytes := buf[offset : offset+numBytes]
-			sample := int16(bytes[0]) | int16(bytes[1])<<8
-			samples[i] = float64(sample) / float64(0x7fff)
-		}
-	default:
-		panic(fmt.Sprintf("Unimplemented format %q", s.format))
-	}
-	return samples
-}
-
-func decodeAudioFile(filename string) (channels, samplerate int, ft format, stream io.Reader) {
-	// TODO: Close ffmpeg
-	r, w := io.Pipe()
-	go func() {
-		cmd := exec.Command(
-			"ffmpeg",
-			"-i", filename,
-			"-f", "s16le",
-			"-acodec", "pcm_s16le",
-			"-ac", "1",
-			"-ar", "22000",
-			"-",
-		)
-		cmd.Stdout = w
-		if err := cmd.Run(); err != nil {
-			if err := w.CloseWithError(err); err != nil {
-				log.Print(err)
-			}
-			return
-		}
-		w.Close()
-	}()
-	return 1, 22000, "s16le", r
 }

@@ -2,6 +2,8 @@ package shadertoy
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -14,7 +16,7 @@ import (
 var (
 	inputMappingSourceRe = regexp.MustCompile(`(?m)^#pragma\s+map\s+(\w+)=([^:]+):(.+)$`)
 	inputMappingRe       = regexp.MustCompile(`^(\w+)=([^:]+):(.+)$`)
-	ichannelNumRe        = regexp.MustCompile(`^iChannel(\d+)$`)
+	IchannelNumRe        = regexp.MustCompile(`^iChannel(\d+)$`)
 )
 
 var texIndexEnum uint32
@@ -26,7 +28,16 @@ var texIndexEnum uint32
 //
 // The functions are called with the mapping that should be instantiated, the
 // current working directory and an enumerator for texture IDs.
-var resourceBuilders = map[string]func(Mapping, *uint32, renderer.RenderState) (resource, error){}
+var resourceBuilders = map[string]ResourceBuildFunc{}
+
+type ResourceBuildFunc func(Mapping, *uint32, renderer.RenderState) (Resource, error)
+
+func RegisterResourceType(name string, fn ResourceBuildFunc) {
+	if _, ok := resourceBuilders[name]; ok {
+		panic(name + " is already registered as resource type")
+	}
+	resourceBuilders[name] = fn
+}
 
 // ShaderToy implements a shader environment similar to the one on
 // shadertoy.com.
@@ -35,7 +46,7 @@ type ShaderToy struct {
 	Mappings      []Mapping
 	GLSLVersion   string
 
-	resources []resource
+	resources []Resource
 }
 
 func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
@@ -159,7 +170,7 @@ func (st *ShaderToy) Close() error {
 	return nil
 }
 
-type resource interface {
+type Resource interface {
 	UniformSource() string
 	PreRender(state renderer.RenderState)
 	Close() error
@@ -224,10 +235,27 @@ func deduplicateMappings(inMappings ...Mapping) []Mapping {
 	return outMappings
 }
 
-func (m Mapping) resource(state renderer.RenderState) (resource, error) {
+func (m Mapping) resource(state renderer.RenderState) (Resource, error) {
 	fn, ok := resourceBuilders[m.Namespace]
 	if !ok {
 		return nil, fmt.Errorf("don't know how to map %s", m.Namespace)
 	}
 	return fn(m, &texIndexEnum, state)
+}
+
+func ResolvePath(pwd, path string) (string, error) {
+	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
+		return "", fmt.Errorf("URLs are not supported")
+	}
+	if len(path) > 0 && path[0] == '~' {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, path[1:]), nil
+	}
+	if !filepath.IsAbs(path) {
+		return filepath.Join(pwd, path), nil
+	}
+	return path, nil
 }

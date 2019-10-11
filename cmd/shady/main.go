@@ -23,6 +23,7 @@ import (
 	"github.com/polyfloyd/shady/encode"
 	"github.com/polyfloyd/shady/renderer"
 	"github.com/polyfloyd/shady/shadertoy"
+	_ "github.com/polyfloyd/shady/shadertoy/audio"
 )
 
 func main() {

@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
-	"log"
 	"math/rand"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 
@@ -16,7 +13,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["builtin"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
+	resourceBuilders["builtin"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (Resource, error) {
 		switch m.Value {
 		case "Back Buffer":
 			r := &backBufferImage{
@@ -37,8 +34,12 @@ func init() {
 			return nil, fmt.Errorf("unknown builtin mapping %q", m.Value)
 		}
 	}
-	resourceBuilders["image"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (resource, error) {
-		fd, err := os.Open(resolvePath(m.PWD, m.Value))
+	resourceBuilders["image"] = func(m Mapping, texIndexEnum *uint32, _ renderer.RenderState) (Resource, error) {
+		path, err := ResolvePath(m.PWD, m.Value)
+		if err != nil {
+			return nil, err
+		}
+		fd, err := os.Open(path)
 		if err != nil {
 			return nil, err
 		}
@@ -110,7 +111,7 @@ func (tex *imageTexture) PreRender(state renderer.RenderState) {
 		gl.BindTexture(gl.TEXTURE_2D, tex.id)
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
-	if m := ichannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
+	if m := IchannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(tex.rect.Dx()), float32(tex.rect.Dy()), 1.0)
 		}
@@ -150,7 +151,7 @@ func (tex *backBufferImage) PreRender(state renderer.RenderState) {
 		gl.BindTexture(gl.TEXTURE_2D, state.PreviousFrameTexID())
 		gl.Uniform1i(loc.Location, int32(tex.index))
 	}
-	if m := ichannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
+	if m := IchannelNumRe.FindStringSubmatch(tex.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
 			gl.Uniform3f(loc.Location, float32(state.CanvasWidth), float32(state.CanvasHeight), 1.0)
 		}
@@ -161,21 +162,3 @@ func (tex *backBufferImage) PreRender(state renderer.RenderState) {
 }
 
 func (tex *backBufferImage) Close() error { return nil }
-
-func resolvePath(pwd, path string) string {
-	if strings.HasPrefix(path, "https://") || strings.HasPrefix(path, "http://") {
-		return path
-	}
-	if len(path) > 0 && path[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			log.Println(err)
-			return path
-		}
-		return filepath.Join(home, path[1:])
-	}
-	if !filepath.IsAbs(path) {
-		return filepath.Join(pwd, path)
-	}
-	return path
-}

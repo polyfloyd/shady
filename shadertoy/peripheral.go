@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	resourceBuilders["perip_mat4"] = func(m Mapping, _ *uint32, _ renderer.RenderState) (resource, error) {
+	resourceBuilders["perip_mat4"] = func(m Mapping, _ *uint32, _ renderer.RenderState) (Resource, error) {
 		return newMat4Peripheral(m.Name, m.PWD, m.Value)
 	}
 }
@@ -35,14 +35,18 @@ type periphMat4 struct {
 	closed, loopClosed chan struct{}
 }
 
-func newMat4Peripheral(uniformName, pwd, value string) (resource, error) {
+func newMat4Peripheral(uniformName, pwd, value string) (Resource, error) {
 	var reader io.ReadCloser
 	var err error
 	var failSilent bool
 	if match := periphFile.FindStringSubmatch(value); match != nil {
 		failSilent = match[2] != ""
+		path, err := ResolvePath(pwd, match[1])
+		if err != nil {
+			return nil, err
+		}
 		var fd *os.File
-		fd, err = os.Open(resolvePath(pwd, match[1]))
+		fd, err = os.Open(path)
 		if err == nil {
 			reader = fd
 		}
