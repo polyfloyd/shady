@@ -25,41 +25,24 @@ func init() {
 	})
 }
 
-const audioTexWidth = 512
-
-var (
-	audioGenericValueRe = regexp.MustCompile(`^([^;]+)$`)
-	audioPCMValueRe     = regexp.MustCompile(`^([^;]+);(\d+):(\d+):([su]\d{1,2}[lb]e)$`)
+const (
+	texWidth  = 512
+	texHeight = 2
 )
 
-type format string
+var (
+	genericValueRe = regexp.MustCompile(`^([^;]+)$`)
+	pcmValueRe     = regexp.MustCompile(`^([^;]+);(\d+):(\d+):([su]\d{1,2}[lb]e)$`)
+)
 
-func (f format) Bits() int {
-	s := f[1:3]
-	if s[1] < '0' || '9' < s[1] {
-		s = s[:1]
-	}
-	b, err := strconv.Atoi(string(s))
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
-func parseMappingValue(pwd, value string) (audioSource, error) {
-	if match := audioGenericValueRe.FindStringSubmatch(value); match != nil {
-		channels, samplerate, ft, pcmStream := decodeAudioFile(match[1])
-		return &rawSource{
-			file:       pcmStream,
-			sampleRate: samplerate,
-			channels:   channels,
-			format:     ft,
-		}, nil
+func parseMappingValue(pwd, value string) (*source, error) {
+	if match := genericValueRe.FindStringSubmatch(value); match != nil {
+		return decodeAudioFile(match[1])
 	}
 
-	match := audioPCMValueRe.FindStringSubmatch(value)
+	match := pcmValueRe.FindStringSubmatch(value)
 	if match == nil {
-		return nil, fmt.Errorf("could not parse audio value: %q (format: %s)", value, audioPCMValueRe)
+		return nil, fmt.Errorf("could not parse audio value: %q (format: %s)", value, pcmValueRe)
 	}
 	filename, err := shadertoy.ResolvePath(pwd, match[1])
 	if err != nil {
@@ -82,41 +65,41 @@ func parseMappingValue(pwd, value string) (audioSource, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not open audio source: %v", err)
 	}
-	return &rawSource{
+	return &source{
+		SampleRate: samplerate,
+		Channels:   channels,
+		Format:     format,
 		file:       fd,
-		sampleRate: samplerate,
-		channels:   channels,
-		format:     format,
 	}, nil
 }
 
-// audioTexture is a mapping of an audio stream.
-type audioTexture struct {
+// texture is a mapping of an audio stream.
+type texture struct {
 	uniformName string
 	id          uint32
 	index       uint32
-	source      audioSource
+	source      *source
 
 	prevPeriod []float64
 }
 
-func newAudioTexture(uniformName string, source audioSource, texIndex uint32) *audioTexture {
-	at := &audioTexture{
+func newAudioTexture(uniformName string, source *source, texIndex uint32) *texture {
+	at := &texture{
 		uniformName: uniformName,
 		index:       texIndex,
 		source:      source,
-		prevPeriod:  make([]float64, audioTexWidth),
+		prevPeriod:  make([]float64, texWidth),
 	}
 	gl.GenTextures(1, &at.id)
 	gl.BindTexture(gl.TEXTURE_2D, at.id)
 
-	var initialData [audioTexWidth * 2 * 3]uint8
+	var initialData [texWidth * texHeight * 3]uint8
 	gl.TexImage2D(
 		gl.TEXTURE_2D,          // target
 		0,                      // level
 		gl.RGBA,                // internalFormat
-		audioTexWidth,          // width
-		2,                      // height
+		texWidth,               // width
+		texHeight,              // height
 		0,                      // border
 		gl.RGB,                 // format
 		gl.UNSIGNED_BYTE,       // type
@@ -129,7 +112,7 @@ func newAudioTexture(uniformName string, source audioSource, texIndex uint32) *a
 	return at
 }
 
-func (at *audioTexture) UniformSource() string {
+func (at *texture) UniformSource() string {
 	return fmt.Sprintf(`
 		uniform sampler2D %s;
 		uniform vec3 %sSize;
@@ -137,31 +120,31 @@ func (at *audioTexture) UniformSource() string {
 	`, at.uniformName, at.uniformName, at.uniformName)
 }
 
-func (at *audioTexture) PreRender(state renderer.RenderState) {
+func (at *texture) PreRender(state renderer.RenderState) {
 	newPeriod := at.source.ReadSamples(state.Interval)
 	at.prevPeriod = append(at.prevPeriod, newPeriod...)[len(newPeriod):]
-	period := at.prevPeriod[len(at.prevPeriod)-audioTexWidth:]
+	period := at.prevPeriod[len(at.prevPeriod)-texWidth:]
 
 	if loc, ok := state.Uniforms[at.uniformName]; ok {
-		textureData := make([]uint8, audioTexWidth*2*3)
+		textureData := make([]uint8, texWidth*texHeight*3)
 		freqs := fft.FFTReal(period)
-		for x := 0; x < audioTexWidth/2; x++ {
+		for x := 0; x < texWidth/2; x++ {
 			// FFT
 			fft1 := uint8((real(freqs[x])*0.5 + 0.5) * 255.0)
 			fft2 := uint8((imag(freqs[x])*0.5 + 0.5) * 255.0)
-			textureData[x*2*3+0] = fft1
-			textureData[x*2*3+1] = fft1
-			textureData[x*2*3+2] = fft1
-			textureData[(x*2+1)*3+0] = fft2
-			textureData[(x*2+1)*3+1] = fft2
-			textureData[(x*2+1)*3+2] = fft2
+			textureData[x*texHeight*3+0] = fft1
+			textureData[x*texHeight*3+1] = fft1
+			textureData[x*texHeight*3+2] = fft1
+			textureData[(x*texHeight+1)*3+0] = fft2
+			textureData[(x*texHeight+1)*3+1] = fft2
+			textureData[(x*texHeight+1)*3+2] = fft2
 		}
-		for x := 0; x < audioTexWidth; x++ {
+		for x := 0; x < texWidth; x++ {
 			// Wave
 			wave := uint8((period[x]*0.5 + 0.5) * 255.0)
-			textureData[(audioTexWidth+x)*3+0] = wave
-			textureData[(audioTexWidth+x)*3+1] = wave
-			textureData[(audioTexWidth+x)*3+2] = wave
+			textureData[(texWidth+x)*3+0] = wave
+			textureData[(texWidth+x)*3+1] = wave
+			textureData[(texWidth+x)*3+2] = wave
 		}
 
 		gl.ActiveTexture(gl.TEXTURE0 + at.index)
@@ -171,8 +154,8 @@ func (at *audioTexture) PreRender(state renderer.RenderState) {
 			0,                   // level,
 			0,                   // xoffset,
 			0,                   // yoffset,
-			audioTexWidth,       // width,
-			2,                   // height,
+			texWidth,            // width,
+			texHeight,           // height,
 			gl.RGB,              // format,
 			gl.UNSIGNED_BYTE,    // type,
 			gl.Ptr(textureData), // data
@@ -181,11 +164,11 @@ func (at *audioTexture) PreRender(state renderer.RenderState) {
 	}
 	if m := shadertoy.IchannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelResolution[%s]", m[1])]; ok {
-			gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
+			gl.Uniform3f(loc.Location, float32(texWidth), float32(texHeight), 1.0)
 		}
 	}
 	if loc, ok := state.Uniforms[fmt.Sprintf("%sSize", at.uniformName)]; ok {
-		gl.Uniform3f(loc.Location, float32(audioTexWidth), 2.0, 1.0)
+		gl.Uniform3f(loc.Location, float32(texWidth), float32(texHeight), 1.0)
 	}
 	if m := shadertoy.IchannelNumRe.FindStringSubmatch(at.uniformName); m != nil {
 		if loc, ok := state.Uniforms[fmt.Sprintf("iChannelTime[%s]", m[1])]; ok {
@@ -196,11 +179,12 @@ func (at *audioTexture) PreRender(state renderer.RenderState) {
 		gl.Uniform1f(loc.Location, float32(state.Time)/float32(time.Second))
 	}
 	if loc, ok := state.Uniforms["iSampleRate"]; ok {
-		gl.Uniform1f(loc.Location, at.source.SampleRate())
+		gl.Uniform1f(loc.Location, float32(at.source.SampleRate))
 	}
 }
 
-func (at *audioTexture) Close() error {
+func (at *texture) Close() error {
+	at.source.Close()
 	gl.DeleteTextures(1, &at.id)
 	return nil
 }
