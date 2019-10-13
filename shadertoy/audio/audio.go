@@ -27,7 +27,7 @@ func init() {
 
 const (
 	texWidth  = 512
-	texHeight = 2
+	texHeight = 4
 )
 
 var (
@@ -80,15 +80,17 @@ type texture struct {
 	index       uint32
 	source      *source
 
-	prevPeriod []float64
+	prevPeriod     []float64
+	stabilizedWave []float64
 }
 
 func newAudioTexture(uniformName string, source *source, texIndex uint32) *texture {
 	at := &texture{
-		uniformName: uniformName,
-		index:       texIndex,
-		source:      source,
-		prevPeriod:  make([]float64, texWidth),
+		uniformName:    uniformName,
+		index:          texIndex,
+		source:         source,
+		prevPeriod:     make([]float64, texWidth),
+		stabilizedWave: make([]float64, texWidth),
 	}
 	gl.GenTextures(1, &at.id)
 	gl.BindTexture(gl.TEXTURE_2D, at.id)
@@ -122,29 +124,51 @@ func (at *texture) UniformSource() string {
 
 func (at *texture) PreRender(state renderer.RenderState) {
 	newPeriod := at.source.ReadSamples(state.Interval)
+	prevPeriod := at.prevPeriod[len(at.prevPeriod)-texWidth:]
 	at.prevPeriod = append(at.prevPeriod, newPeriod...)[len(newPeriod):]
 	period := at.prevPeriod[len(at.prevPeriod)-texWidth:]
 
 	if loc, ok := state.Uniforms[at.uniformName]; ok {
 		textureData := make([]uint8, texWidth*texHeight*3)
+		// FFT
 		freqs := fft.FFTReal(period)
 		for x := 0; x < texWidth/2; x++ {
-			// FFT
 			fft1 := uint8((real(freqs[x])*0.5 + 0.5) * 255.0)
 			fft2 := uint8((imag(freqs[x])*0.5 + 0.5) * 255.0)
-			textureData[x*texHeight*3+0] = fft1
-			textureData[x*texHeight*3+1] = fft1
-			textureData[x*texHeight*3+2] = fft1
-			textureData[(x*texHeight+1)*3+0] = fft2
-			textureData[(x*texHeight+1)*3+1] = fft2
-			textureData[(x*texHeight+1)*3+2] = fft2
+			textureData[x*2*3+0] = fft1
+			textureData[x*2*3+1] = fft1
+			textureData[x*2*3+2] = fft1
+			textureData[(x*2+1)*3+0] = fft2
+			textureData[(x*2+1)*3+1] = fft2
+			textureData[(x*2+1)*3+2] = fft2
 		}
+		// Wave
 		for x := 0; x < texWidth; x++ {
-			// Wave
 			wave := uint8((period[x]*0.5 + 0.5) * 255.0)
 			textureData[(texWidth+x)*3+0] = wave
 			textureData[(texWidth+x)*3+1] = wave
 			textureData[(texWidth+x)*3+2] = wave
+		}
+		// Stabilized Wave
+		corrPeriod := period
+		// Search the newly read samples for a window of samples that
+		// resebles the previous period.
+		best := -1.0
+		for i := 0; i < len(newPeriod)-texWidth; i++ {
+			p := newPeriod[i : i+texWidth]
+			w := correlate(p, prevPeriod)
+			if w > best {
+				best = w
+				corrPeriod = p
+			}
+		}
+		const n = 0.5
+		for x := 0; x < texWidth; x++ {
+			at.stabilizedWave[x] = at.stabilizedWave[x]*(1-n) + corrPeriod[x]*n
+			wave := uint8((at.stabilizedWave[x]*0.5 + 0.5) * 255.0)
+			textureData[(texWidth*2+x)*3+0] = wave
+			textureData[(texWidth*2+x)*3+1] = wave
+			textureData[(texWidth*2+x)*3+2] = wave
 		}
 
 		gl.ActiveTexture(gl.TEXTURE0 + at.index)
@@ -187,4 +211,15 @@ func (at *texture) Close() error {
 	at.source.Close()
 	gl.DeleteTextures(1, &at.id)
 	return nil
+}
+
+func correlate(a, b []float64) float64 {
+	if len(a) != len(b) {
+		panic("mismatched slice lengths")
+	}
+	w := 0.0
+	for i := range a {
+		w += a[i] * b[i]
+	}
+	return w
 }
