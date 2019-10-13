@@ -268,11 +268,6 @@ func (sh *Shader) nextHandle(interval time.Duration) interface{} {
 	return handle
 }
 
-func (sh *Shader) Image() image.Image {
-	handle := sh.nextHandle(0)
-	return sh.renderer.Image(handle)
-}
-
 func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream chan<- image.Image) {
 	buffer := make(chan interface{}, sh.renderer.NumBuffers())
 	for {
