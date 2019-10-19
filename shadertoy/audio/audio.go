@@ -162,7 +162,7 @@ func (at *texture) PreRender(state renderer.RenderState) {
 				corrPeriod = p
 			}
 		}
-		const n = 0.5
+		const n = 0.35
 		for x := 0; x < texWidth; x++ {
 			at.stabilizedWave[x] = at.stabilizedWave[x]*(1-n) + corrPeriod[x]*n
 			wave := uint8((at.stabilizedWave[x]*0.5 + 0.5) * 255.0)

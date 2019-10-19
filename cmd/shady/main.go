@@ -165,9 +165,15 @@ func main() {
 		log.Printf("GLSL version: %s", *glslVersion)
 	}
 
-	sh, err := renderer.NewShader(width, height, openGLVersion)
+	//	sh, err := renderer.NewShader(width, height, openGLVersion)
+	//	if err != nil {
+	//		log.Fatalf("Could initialize OpenGL: %v", err)
+	//	}
+	//	defer sh.Close()
+	_, _ = width, height
+	sh, err := renderer.NewOnScreenEngine(openGLVersion)
 	if err != nil {
-		log.Fatalf("Could initialize OpenGL: %v", err)
+		log.Fatalf("Could initialize engine: %v", err)
 	}
 	defer sh.Close()
 
@@ -258,7 +264,10 @@ func main() {
 			}()
 		}
 
-		sh.Animate(loopCtx, interval, in)
+		//		sh.Animate(loopCtx, interval, in)
+		if err := sh.Animate(loopCtx); err == renderer.ErrWindowClosed {
+			return
+		}
 		watcher.Close()
 		loopCancel()
 	}

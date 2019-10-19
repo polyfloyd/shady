@@ -13,8 +13,8 @@ import (
 type Stage string
 
 const (
-	StageVertex   = "vert"
-	StageFragment = "frag"
+	StageVertex   Stage = "vert"
+	StageFragment Stage = "frag"
 )
 
 func (stage Stage) glEnum() (uint32, error) {

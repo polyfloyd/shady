@@ -2,6 +2,7 @@ package renderer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -15,7 +16,30 @@ import (
 	"time"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
+
 	"github.com/polyfloyd/shady/egl"
+)
+
+const (
+	textureCopyVert = SourceBuf(`#version 330 core
+		in vec2 pos;
+		out vec2 texCoord;
+
+		void main() {
+			gl_Position = vec4(pos.x, pos.y, 0.0, 1.0);
+			texCoord = pos * .5 + .5;
+		}
+	`)
+	textureCopyFrag = SourceBuf(`#version 330 core
+		out vec4 fragColor;
+		in vec2 texCoord;
+		uniform sampler2D screenTexture;
+
+		void main() {
+			fragColor = texture(screenTexture, texCoord);
+		}
+	`)
 )
 
 const (
@@ -27,32 +51,11 @@ const (
 	OpenGL33 OpenGLVersion = 33
 )
 
+var ErrWindowClosed = errors.New("window closed")
+
 var initGLOnce sync.Once
 
-type Shader struct {
-	w, h      uint
-	glVersion OpenGLVersion
-
-	vertLoc uint32
-	vao     uint32
-	vbo     uint32
-
-	uniforms map[string]Uniform
-	renderer renderer
-	program  uint32
-
-	env     Environment
-	newEnvs chan Environment
-
-	subTargets map[string]*Shader
-
-	time            time.Duration
-	frame           uint64
-	prevFrameHandle interface{}
-}
-
-func initGL(glVersion OpenGLVersion) error {
-	// Set up a rendering context.
+func initEGL(glVersion OpenGLVersion) error {
 	display, err := egl.GetDisplay(egl.DefaultDisplay)
 	if err != nil {
 		return err
@@ -70,8 +73,10 @@ func initGL(glVersion OpenGLVersion) error {
 		return err
 	}
 	glContext.MakeCurrent()
+	return nil
+}
 
-	// Initialize OpenGL.
+func initOpenGL() error {
 	if err := gl.Init(); err != nil {
 		return err
 	}
@@ -81,10 +86,33 @@ func initGL(glVersion OpenGLVersion) error {
 		for dm := range debug {
 			if dm.Severity != gl.DEBUG_SEVERITY_NOTIFICATION {
 				fmt.Fprintf(os.Stderr, "OpenGL %s: %s\n", dm.SeverityString(), dm.Message)
+				fmt.Fprintf(os.Stderr, "           %s\n", dm.Stack)
 			}
 		}
 	}()
 	return nil
+}
+
+type Shader struct {
+	w, h      uint
+	glVersion OpenGLVersion
+
+	vertLoc uint32
+	vao     uint32
+	vbo     uint32
+
+	uniforms map[string]Uniform
+	renderer imageRenderer
+	program  uint32
+
+	env     Environment
+	newEnvs chan Environment
+
+	subTargets map[string]*Shader
+
+	time            time.Duration
+	frame           uint64
+	prevFrameHandle interface{}
 }
 
 func NewShader(width, height uint, glVersion OpenGLVersion) (*Shader, error) {
@@ -92,9 +120,17 @@ func NewShader(width, height uint, glVersion OpenGLVersion) (*Shader, error) {
 	// detect whether we are running as a test for now.
 	var err error
 	if strings.HasSuffix(os.Args[0], ".test") {
-		err = initGL(glVersion)
+		err = initOpenGL()
+		if err == nil {
+			err = initEGL(glVersion)
+		}
 	} else {
-		initGLOnce.Do(func() { err = initGL(glVersion) })
+		initGLOnce.Do(func() {
+			err = initOpenGL()
+			if err == nil {
+				err = initEGL(glVersion)
+			}
+		})
 	}
 	if err != nil {
 		return nil, err
@@ -112,21 +148,7 @@ func NewShader(width, height uint, glVersion OpenGLVersion) (*Shader, error) {
 	if err := sh.renderer.Setup(); err != nil {
 		return nil, err
 	}
-
-	// Create the canvas.
-	vertices := []float32{
-		-1.0, -1.0, 0.0,
-		1.0, -1.0, 0.0,
-		-1.0, 1.0, 0.0,
-		1.0, 1.0, 0.0,
-	}
-	gl.GenVertexArrays(1, &sh.vao)
-	gl.BindVertexArray(sh.vao)
-	gl.GenBuffers(1, &sh.vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, sh.vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
-	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
-	gl.BindVertexArray(0)
+	sh.vao, sh.vbo = createGLQuad()
 
 	return sh, nil
 }
@@ -312,6 +334,264 @@ func (sh *Shader) Close() error {
 	return envErr
 }
 
+// OnScreenEngine is an animation engine for rendering to an OS window.
+//
+// Internally, it renders to a framebuffer so we can obtain a texture
+// containing a rendered frame that can be used as the previous frame in
+// shaders. This texture is then immediately outputted to the window by drawing
+// a fullscreen quad.
+type OnScreenEngine struct {
+	env     Environment
+	newEnvs chan Environment
+
+	glVersion OpenGLVersion
+
+	quadVAO     uint32
+	quadVBO     uint32
+	vertLoc     uint32
+	copyProgram uint32
+
+	targets [2]struct {
+		fbo, tex uint32
+	}
+
+	program    uint32
+	subTargets map[string]*Shader
+	uniforms   map[string]Uniform
+
+	time  time.Duration
+	frame uint64
+
+	window *glfw.Window
+}
+
+func NewOnScreenEngine(glVersion OpenGLVersion) (*OnScreenEngine, error) {
+	if err := glfw.Init(); err != nil {
+		return nil, err
+	}
+
+	maj, min := glVersion.majorMinor()
+	glfw.WindowHint(glfw.ContextVersionMajor, maj)
+	glfw.WindowHint(glfw.ContextVersionMinor, min)
+	window, err := glfw.CreateWindow(1366, 768, "Shady", nil, nil)
+	if err != nil {
+		glfw.Terminate()
+		return nil, err
+	}
+	window.MakeContextCurrent()
+
+	if err := initOpenGL(); err != nil {
+		window.Destroy()
+		glfw.Terminate()
+		return nil, err
+	}
+
+	eng := &OnScreenEngine{
+		newEnvs: make(chan Environment, 1),
+		window:  window,
+	}
+
+	w, h := eng.window.GetFramebufferSize()
+	eng.onResize(window, w, h)
+	window.SetSizeCallback(eng.onResize)
+
+	eng.copyProgram, err = linkProgram(map[Stage][]Source{
+		StageVertex:   {textureCopyVert},
+		StageFragment: {textureCopyFrag},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	eng.quadVAO, eng.quadVBO = createGLQuad()
+	return eng, nil
+}
+
+func (eng *OnScreenEngine) onResize(win *glfw.Window, width int, height int) {
+	for i := range eng.targets {
+		t := &eng.targets[i]
+		if t.fbo != 0 {
+			gl.DeleteFramebuffers(1, &t.fbo)
+		}
+		if t.tex != 0 {
+			gl.DeleteTextures(1, &t.tex)
+		}
+
+		gl.GenFramebuffers(1, &t.fbo)
+		gl.BindFramebuffer(gl.FRAMEBUFFER, t.fbo)
+		gl.GenTextures(1, &t.tex)
+		gl.BindTexture(gl.TEXTURE_2D, t.tex)
+		zeroes := make([]byte, width*height*3)
+		gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGB, int32(width), int32(height), 0, gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(&zeroes[0]))
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+		gl.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.tex, 0)
+		if gl.CheckFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE {
+			panic(fmt.Errorf("incomplete framebuffer"))
+		}
+	}
+	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+	gl.BindTexture(gl.TEXTURE_2D, 0)
+
+	gl.Viewport(0, 0, int32(width), int32(height))
+}
+
+func (eng *OnScreenEngine) Animate(ctx context.Context) error {
+	lastFrame := time.Now()
+	interval := time.Second / 60
+	i := 0
+	for {
+		if eng.window.ShouldClose() {
+			return ErrWindowClosed
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		if err := eng.reloadEnvironment(ctx); err == context.Canceled {
+			return err
+		} else if err != nil {
+			log.Printf("Error reloading environment: %v", err)
+			continue
+		}
+
+		gl.BindVertexArray(eng.quadVAO)
+		gl.BindBuffer(gl.ARRAY_BUFFER, eng.quadVBO)
+
+		target := &eng.targets[i%len(eng.targets)]
+		prevTarget := &eng.targets[(i+len(eng.targets)-1)%len(eng.targets)]
+
+		// 1st pass: render the actual image.
+		w, h := eng.window.GetFramebufferSize()
+		gl.BindFramebuffer(gl.FRAMEBUFFER, target.fbo)
+		gl.UseProgram(eng.program)
+		eng.env.PreRender(RenderState{
+			Time:               eng.time,
+			Interval:           interval,
+			FramesProcessed:    eng.frame,
+			CanvasWidth:        uint(w),
+			CanvasHeight:       uint(h),
+			Uniforms:           eng.uniforms,
+			PreviousFrameTexID: func() uint32 { return prevTarget.tex },
+			SubBuffers:         nil, // TODO
+		})
+
+		gl.EnableVertexAttribArray(eng.vertLoc)
+		gl.VertexAttribPointer(eng.vertLoc, 3, gl.FLOAT, false, 0, nil)
+		gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+		// 2nd pass: copy the rendered image to the on-screen framebuffer.
+		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+		gl.UseProgram(eng.copyProgram)
+		gl.ActiveTexture(gl.TEXTURE0)
+		gl.BindTexture(gl.TEXTURE_2D, target.tex)
+		gl.Uniform1i(
+			gl.GetUniformLocation(eng.copyProgram, gl.Str("screenTexture\x00")),
+			0,
+		)
+
+		loc := uint32(gl.GetAttribLocation(eng.copyProgram, gl.Str("pos\x00")))
+		gl.EnableVertexAttribArray(loc)
+		gl.VertexAttribPointer(loc, 3, gl.FLOAT, false, 0, nil)
+		gl.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
+
+		now := time.Now()
+		interval = now.Sub(lastFrame)
+		lastFrame = now
+		eng.time += interval
+		eng.frame++
+		i++
+
+		eng.window.SwapBuffers()
+		glfw.PollEvents()
+	}
+}
+
+func (eng *OnScreenEngine) Close() error {
+	eng.window.Destroy()
+	glfw.Terminate()
+	return nil
+}
+
+func (eng *OnScreenEngine) reloadEnvironment(ctx context.Context) error {
+	var env Environment
+	if eng.env == nil {
+		// If no environment is set, block until it is set or the context is
+		// canceled.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case env = <-eng.newEnvs:
+		}
+	} else {
+		// If an environment is already set, check if a newer environment is
+		// available or just exit.
+		select {
+		case env = <-eng.newEnvs:
+		default:
+			return nil
+		}
+	}
+
+	// Close the old environment if there is one.
+	if eng.env != nil {
+		eng.env.Close()
+		gl.DeleteProgram(eng.program)
+		eng.env = nil
+	}
+	if env == nil {
+		return nil
+	}
+
+	w, h := eng.window.GetFramebufferSize()
+	renderState := RenderState{
+		Time:            eng.time,
+		FramesProcessed: eng.frame,
+		CanvasWidth:     uint(w),
+		CanvasHeight:    uint(h),
+		Uniforms:        eng.uniforms,
+	}
+	if err := env.Setup(renderState); err != nil {
+		return fmt.Errorf("error setting up environment: %v", err)
+	}
+
+	subEnvs, err := env.SubEnvironments()
+	if err != nil {
+		return err
+	}
+	eng.subTargets = map[string]*Shader{}
+	for name, env := range subEnvs {
+		s, err := NewShader(env.Width, env.Height, eng.glVersion)
+		if err != nil {
+			return err
+		}
+		s.SetEnvironment(env.Environment)
+		if err := s.reloadEnvironment(context.Background()); err != nil {
+			return err
+		}
+		eng.subTargets[name] = s
+	}
+
+	sources, err := env.Sources()
+	if err != nil {
+		return err
+	}
+	eng.program, err = linkProgram(sources)
+	if err != nil {
+		return err
+	}
+	gl.UseProgram(eng.program)
+	eng.uniforms = ListUniforms(eng.program)
+	eng.vertLoc = uint32(gl.GetAttribLocation(eng.program, gl.Str("vert\x00")))
+
+	eng.env = env
+	return nil
+}
+
+func (eng *OnScreenEngine) SetEnvironment(env Environment) {
+	eng.newEnvs <- env
+}
+
 // flip wraps an image and flips it upside down.
 type flip struct {
 	image.Image
@@ -328,8 +608,12 @@ type renderer interface {
 	NumBuffers() int
 
 	Draw(func()) (handle interface{})
-	Image(handle interface{}) image.Image
 	Texture(handle interface{}) (uint32, func())
+}
+
+type imageRenderer interface {
+	renderer
+	Image(handle interface{}) image.Image
 }
 
 type pboRenderer struct {
@@ -469,4 +753,21 @@ func (v OpenGLVersion) String() string {
 
 func (v OpenGLVersion) majorMinor() (int, int) {
 	return int(v / 10), int(v % 10)
+}
+
+func createGLQuad() (vao, vbo uint32) {
+	vertices := []float32{
+		-1.0, -1.0, 0.0,
+		1.0, -1.0, 0.0,
+		-1.0, 1.0, 0.0,
+		1.0, 1.0, 0.0,
+	}
+	gl.GenVertexArrays(1, &vao)
+	gl.BindVertexArray(vao)
+	gl.GenBuffers(1, &vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(&vertices[0]), gl.STATIC_DRAW)
+	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
+	gl.BindVertexArray(0)
+	return
 }
