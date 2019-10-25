@@ -37,7 +37,7 @@ var (
 
 func parseMappingValue(pwd, value string) (*source, error) {
 	if match := genericValueRe.FindStringSubmatch(value); match != nil {
-		return decodeAudioFile(match[1])
+		return newAudioFileSource(match[1])
 	}
 
 	match := pcmValueRe.FindStringSubmatch(value)

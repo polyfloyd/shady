@@ -13,11 +13,10 @@ type source struct {
 	SampleRate int
 	Channels   int
 	Format     format
-
-	file io.ReadCloser
+	file       io.ReadCloser
 }
 
-func decodeAudioFile(filename string) (*source, error) {
+func newAudioFileSource(filename string) (*source, error) {
 	r, w := io.Pipe()
 	go func() {
 		cmd := exec.Command(
@@ -49,7 +48,7 @@ func decodeAudioFile(filename string) (*source, error) {
 func (s *source) ReadSamples(period time.Duration) []float64 {
 	numBytes := s.Format.Bits() / 8
 	buf := make([]byte, s.SampleRate*s.Channels*int(period)/int(time.Second)*numBytes)
-	n, err := io.ReadAtLeast(s.file, buf, len(buf))
+	n, err := s.file.Read(buf)
 	if err != nil {
 		return make([]float64, time.Duration(s.SampleRate)*period/time.Second)
 	}
