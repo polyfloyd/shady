@@ -9,7 +9,6 @@ import (
 
 var Formats = map[string]Format{
 	"ansi":   &AnsiDisplay{},
-	"x11":    &X11Display{},
 	"gif":    GIFFormat{},
 	"jpg":    JPGFormat{},
 	"png":    PNGFormat{},

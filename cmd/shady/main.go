@@ -44,7 +44,7 @@ func main() {
 	flag.Var(&inputFiles, "i", "The shader file(s) to use")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
-	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(formatNames, ", "))
+	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(append(formatNames, "x11"), ", "))
 	framerate := flag.Float64("f", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("n", 0, "Limit the number of frames in the animation. No limit is set by default")
 	duration := flag.Float64("d", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
@@ -103,23 +103,6 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 
-	var format encode.Format
-	var ok bool
-	if *outputFormat == "" {
-		if format, ok = encode.DetectFormat(*outputFile); !ok {
-			log.Fatalf("Unable to detect output format. Please set the -ofmt flag")
-		}
-	} else if format, ok = encode.Formats[*outputFormat]; !ok {
-		log.Fatalf("Unknown output format: %q", *outputFile)
-	}
-
-	// Open the output.
-	outWriter, err := openWriter(*outputFile)
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
-	defer outWriter.Close()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
@@ -127,24 +110,6 @@ func main() {
 		signal.Notify(sig, os.Interrupt)
 		<-sig
 		signal.Stop(sig)
-		cancel()
-	}()
-
-	in := make(chan image.Image, 10)
-	out := (<-chan image.Image)(in)
-	if animateNumFrames > 0 {
-		out = limitNumFrames(out, animateNumFrames)
-	}
-	if *realtime {
-		out = limitFramerate(out, interval)
-	}
-	if *verbose {
-		out = printStats(out, interval, animateNumFrames)
-	}
-	go func() {
-		if err := format.EncodeAnimation(outWriter, out, interval); err != nil {
-			log.Printf("Error animating: %v", err)
-		}
 		cancel()
 	}()
 
@@ -165,18 +130,110 @@ func main() {
 		log.Printf("GLSL version: %s", *glslVersion)
 	}
 
-	//	sh, err := renderer.NewShader(width, height, openGLVersion)
-	//	if err != nil {
-	//		log.Fatalf("Could initialize OpenGL: %v", err)
-	//	}
-	//	defer sh.Close()
-	_, _ = width, height
-	sh, err := renderer.NewOnScreenEngine(openGLVersion)
+	newFn := func() (renderer.Environment, []string, error) {
+		sources, err := renderer.Includes([]string(inputFiles)...)
+		if err != nil {
+			return nil, sources, err
+		}
+
+		mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
+		for _, str := range shadertoyMappings {
+			m, err := shadertoy.ParseMapping(str, ".")
+			if err != nil {
+				return nil, sources, err
+			}
+			mappings = append(mappings, m)
+		}
+		env, err := shadertoy.NewShaderToy(
+			renderer.SourceFiles(sources...),
+			mappings,
+			*glslVersion,
+		)
+		return env, sources, err
+	}
+
+	// Check whether we should render directly to an onscreen window. This is a
+	// separate rendering path.
+	if *outputFormat == "x11" {
+		engine, err := renderer.NewOnScreenEngine(openGLVersion)
+		if err != nil {
+			log.Fatalf("Could initialize engine: %v", err)
+		}
+		defer engine.Close()
+
+		if *watch {
+			go watchEnvironment(ctx, engine, newFn)
+		} else {
+			env, _, err := newFn()
+			if err != nil {
+				log.Fatal(err)
+			}
+			engine.SetEnvironment(env)
+		}
+
+		if err := engine.Animate(ctx); err == renderer.ErrWindowClosed {
+			return
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	engine, err := renderer.NewShader(width, height, openGLVersion)
 	if err != nil {
 		log.Fatalf("Could initialize engine: %v", err)
 	}
-	defer sh.Close()
+	defer engine.Close()
 
+	var format encode.Format
+	var ok bool
+	if *outputFormat == "" {
+		if format, ok = encode.DetectFormat(*outputFile); !ok {
+			log.Fatalf("Unable to detect output format. Please set the -ofmt flag")
+		}
+	} else if format, ok = encode.Formats[*outputFormat]; !ok {
+		log.Fatalf("Unknown output format: %q", *outputFile)
+	}
+
+	// Open the output.
+	outWriter, err := openWriter(*outputFile)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	defer outWriter.Close()
+
+	in := make(chan image.Image, 10)
+	out := (<-chan image.Image)(in)
+	if animateNumFrames > 0 {
+		out = limitNumFrames(out, animateNumFrames)
+	}
+	if *realtime {
+		out = limitFramerate(out, interval)
+	}
+	if *verbose {
+		out = printStats(out, interval, animateNumFrames)
+	}
+	go func() {
+		if err := format.EncodeAnimation(outWriter, out, interval); err != nil {
+			log.Printf("Error animating: %v", err)
+		}
+		cancel()
+	}()
+
+	if *watch {
+		go watchEnvironment(ctx, engine, newFn)
+	} else {
+		env, _, err := newFn()
+		if err != nil {
+			log.Fatal(err)
+		}
+		engine.SetEnvironment(env)
+	}
+
+	engine.Animate(ctx, interval, in)
+}
+
+func watchEnvironment(ctx context.Context, engine interface{ SetEnvironment(renderer.Environment) }, newFn func() (renderer.Environment, []string, error)) {
 	for ctx.Err() == nil {
 		loopCtx, loopCancel := context.WithCancel(ctx)
 
@@ -185,48 +242,14 @@ func main() {
 			if err != nil {
 				return nil, nil, err
 			}
-
-			// Load the shader sources.
-			sources, err := renderer.Includes([]string(inputFiles)...)
-			if err != nil {
-				for _, src := range inputFiles {
-					if err := watcher.Add(src); err != nil {
-						log.Print(err)
-					}
-				}
-				return nil, watcher, err
+			env, files, err := newFn()
+			for _, f := range files {
+				watcher.Add(f)
 			}
-			for _, src := range sources {
-				if err := watcher.Add(src); err != nil {
-					log.Print(err)
-				}
-			}
-
-			mappings := make([]shadertoy.Mapping, 0, len(shadertoyMappings))
-			for _, str := range shadertoyMappings {
-				m, err := shadertoy.ParseMapping(str, ".")
-				if err != nil {
-					return nil, watcher, err
-				}
-				mappings = append(mappings, m)
-			}
-			env, err := shadertoy.NewShaderToy(
-				renderer.SourceFiles(sources...),
-				mappings,
-				*glslVersion,
-			)
-			if err != nil {
-				return nil, watcher, err
-			}
-			return env, watcher, nil
+			return env, watcher, err
 		}()
 		if err != nil {
 			log.Println(err)
-			if !*watch {
-				watcher.Close()
-				loopCancel()
-				break
-			}
 			select {
 			case <-watcher.Events:
 			case err := <-watcher.Errors:
@@ -241,32 +264,23 @@ func main() {
 		}
 
 		// Load the new environment.
-		sh.SetEnvironment(env)
+		engine.SetEnvironment(env)
 
-		if *watch {
-			go func() {
+		select {
+		case <-watcher.Events:
+			t := time.NewTimer(time.Millisecond * 20)
+		outer:
+			for {
 				select {
 				case <-watcher.Events:
-					t := time.NewTimer(time.Millisecond * 20)
-				outer:
-					for {
-						select {
-						case <-watcher.Events:
-						case <-t.C:
-							break outer
-						}
-					}
-					loopCancel()
-				case err := <-watcher.Errors:
-					log.Println(err)
-				case <-loopCtx.Done():
+				case <-t.C:
+					break outer
 				}
-			}()
-		}
-
-		//		sh.Animate(loopCtx, interval, in)
-		if err := sh.Animate(loopCtx); err == renderer.ErrWindowClosed {
-			return
+			}
+			loopCancel()
+		case err := <-watcher.Errors:
+			log.Println(err)
+		case <-loopCtx.Done():
 		}
 		watcher.Close()
 		loopCancel()
