@@ -44,7 +44,7 @@ func main() {
 	flag.Var(&inputFiles, "i", "The shader file(s) to use")
 	outputFile := flag.String("o", "-", "The file to write the rendered image to")
 	geometry := flag.String("g", "env", "The geometry of the rendered image in WIDTHxHEIGHT format. If \"env\", look for the LEDCAT_GEOMETRY variable")
-	outputFormat := flag.String("ofmt", "", "The encoding format to use to output the image. Valid values are: "+strings.Join(append(formatNames, "x11"), ", "))
+	outputFormat := flag.String("ofmt", "x11", "The encoding format to use to output the image. Valid values are: "+strings.Join(append(formatNames, "x11"), ", "))
 	framerate := flag.Float64("f", 0, "Whether to animate using the specified number of frames per second")
 	numFrames := flag.Uint("n", 0, "Limit the number of frames in the animation. No limit is set by default")
 	duration := flag.Float64("d", 0.0, "Limit the animation to the specified number of seconds. No limit is set by default")
@@ -189,12 +189,10 @@ func main() {
 
 	var format encode.Format
 	var ok bool
-	if *outputFormat == "" {
+	if format, ok = encode.Formats[*outputFormat]; !ok {
 		if format, ok = encode.DetectFormat(*outputFile); !ok {
 			log.Fatalf("Unable to detect output format. Please set the -ofmt flag")
 		}
-	} else if format, ok = encode.Formats[*outputFormat]; !ok {
-		log.Fatalf("Unknown output format: %q", *outputFile)
 	}
 
 	// Open the output.
