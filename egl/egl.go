@@ -8,15 +8,19 @@ import (
 	"strings"
 )
 
-var DefaultDisplay = NativeDisplayType(nil) // C.EGL_DEFAULT_DISPLAY
+var DefaultDisplay = NativeDisplayType{v: C.EGL_DEFAULT_DISPLAY}
 
-type NativeDisplayType C.EGLNativeDisplayType
+type NativeDisplayType struct {
+	v C.EGLNativeDisplayType
+}
 
-type API C.EGLenum
+type API struct {
+	v C.EGLenum
+}
 
-const (
-	OpenGLAPI   = C.EGL_OPENGL_API
-	OpenGLESAPI = C.EGL_OPENGL_ES_API
+var (
+	OpenGLAPI   = API{v: C.EGL_OPENGL_API}
+	OpenGLESAPI = API{v: C.EGL_OPENGL_ES_API}
 )
 
 type Surface struct {
@@ -29,7 +33,7 @@ type Display struct {
 }
 
 func GetDisplay(dtype NativeDisplayType) (Display, error) {
-	dpy := C.eglGetDisplay(C.EGLNativeDisplayType(dtype))
+	dpy := C.eglGetDisplay(dtype.v)
 	if C.eglInitialize(dpy, nil, nil) == C.EGL_FALSE {
 		return Display{}, fmt.Errorf("error initializing display: %v", getError())
 	}
@@ -93,7 +97,7 @@ func (d Display) CreateSurface(width, height uint) (*Surface, error) {
 }
 
 func (d Display) BindAPI(api API) error {
-	if C.eglBindAPI(C.EGLenum(api)) == C.EGL_FALSE {
+	if C.eglBindAPI(api.v) == C.EGL_FALSE {
 		return fmt.Errorf("failed to call eglBindAPI")
 	}
 	return nil
