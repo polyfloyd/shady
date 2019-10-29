@@ -97,12 +97,6 @@ func main() {
 	}
 	interval := time.Duration(float64(time.Second) / *framerate)
 
-	// Figure out the dimensions of the display.
-	width, height, err := parseGeometry(*geometry)
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
@@ -115,11 +109,13 @@ func main() {
 
 	var openGLVersion renderer.OpenGLVersion
 	if *openGLVersionStr == "glsl" {
+		var err error
 		openGLVersion, err = renderer.OpenGLVersionFromGLSLVersion(*glslVersion)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
+		var err error
 		openGLVersion, err = renderer.ParseOpenGLVersion(*openGLVersionStr)
 		if err != nil {
 			log.Fatal(err)
@@ -177,6 +173,12 @@ func main() {
 			log.Fatal(err)
 		}
 		return
+	}
+
+	// Figure out the dimensions of the display.
+	width, height, err := parseGeometry(*geometry)
+	if err != nil {
+		log.Fatalf("%v", err)
 	}
 
 	engine, err := renderer.NewShader(width, height, openGLVersion)
