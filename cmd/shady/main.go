@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"image"
@@ -167,7 +168,7 @@ func main() {
 			engine.SetEnvironment(env)
 		}
 
-		if err := engine.Animate(ctx); err == renderer.ErrWindowClosed {
+		if err := engine.Animate(ctx); errors.Is(err, renderer.ErrWindowClosed) {
 			return
 		} else if err != nil {
 			log.Fatal(err)

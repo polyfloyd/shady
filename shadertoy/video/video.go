@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"io"
@@ -195,7 +196,7 @@ func decodeVideoFile(ctx context.Context, filename string, currentTime time.Dura
 			for {
 				imgBuf := make([]byte, resolution.Dx()*resolution.Dy()*3)
 				if _, err := io.ReadFull(stdout, imgBuf); err != nil {
-					if err != io.EOF {
+					if errors.Is(err, io.EOF) {
 						out <- err
 					}
 					break
@@ -236,19 +237,19 @@ func ffprobe(ctx context.Context, filename string) (*mediaInfo, error) {
 	)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get media info: %v", err)
+		return nil, fmt.Errorf("unable to get media info: %w", err)
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("unable to get media info: %v", err)
+		return nil, fmt.Errorf("unable to get media info: %w", err)
 	}
 
 	var data mediaInfo
 	if err := json.NewDecoder(stdout).Decode(&data); err != nil {
-		return nil, fmt.Errorf("unable to get media info: %v", err)
+		return nil, fmt.Errorf("unable to get media info: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("unable to get media info: %v", err)
+		return nil, fmt.Errorf("unable to get media info: %w", err)
 	}
 	return &data, nil
 }
@@ -265,7 +266,7 @@ func (info *mediaInfo) firstStreamByType(typ string) (int, error) {
 func (info *mediaInfo) Duration() (time.Duration, error) {
 	f, err := strconv.ParseFloat(info.Format.Duration, 64)
 	if err != nil {
-		return 0, fmt.Errorf("could not parse video duration: %v", err)
+		return 0, fmt.Errorf("could not parse video duration: %w", err)
 	}
 	return time.Duration(f * float64(time.Second)), nil
 }
@@ -280,11 +281,11 @@ func (info *mediaInfo) VideoFrameInterval() (time.Duration, error) {
 	s := strings.Split(videoInfo.AvgFrameRate, "/")
 	nu, err := strconv.Atoi(s[0])
 	if err != nil {
-		return -1, fmt.Errorf("could not determine video frame interval: %v", err)
+		return -1, fmt.Errorf("could not determine video frame interval: %w", err)
 	}
 	de, err := strconv.Atoi(s[1])
 	if err != nil {
-		return -1, fmt.Errorf("could not determine video frame interval: %v", err)
+		return -1, fmt.Errorf("could not determine video frame interval: %w", err)
 	}
 
 	if nu == 0 || de == 0 {

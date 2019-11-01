@@ -35,7 +35,7 @@ type Display struct {
 func GetDisplay(dtype NativeDisplayType) (Display, error) {
 	dpy := C.eglGetDisplay(dtype.v)
 	if C.eglInitialize(dpy, nil, nil) == C.EGL_FALSE {
-		return Display{}, fmt.Errorf("error initializing display: %v", getError())
+		return Display{}, fmt.Errorf("error initializing display: %w", getError())
 	}
 	return Display{dpy: dpy}, nil
 }
@@ -134,33 +134,33 @@ func (cx Context) MakeCurrent() {
 func getError() error {
 	switch code := C.eglGetError(); code {
 	case C.EGL_NOT_INITIALIZED:
-		return fmt.Errorf("EGL is not initialized, or could not be initialized, for the specified EGL display connection")
+		return fmt.Errorf("egl is not initialized, or could not be initialized, for the specified EGL display connection")
 	case C.EGL_BAD_ACCESS:
-		return fmt.Errorf("EGL cannot access a requested resource (for example a context is bound in another thread)")
+		return fmt.Errorf("egl cannot access a requested resource (for example a context is bound in another thread)")
 	case C.EGL_BAD_ALLOC:
-		return fmt.Errorf("EGL failed to allocate resources for the requested operation")
+		return fmt.Errorf("egl failed to allocate resources for the requested operation")
 	case C.EGL_BAD_ATTRIBUTE:
-		return fmt.Errorf("An unrecognized attribute or attribute value was passed in the attribute list")
+		return fmt.Errorf("an unrecognized attribute or attribute value was passed in the attribute list")
 	case C.EGL_BAD_CONTEXT:
-		return fmt.Errorf("An EGLContext argument does not name a valid EGL rendering context")
+		return fmt.Errorf("an EGLContext argument does not name a valid EGL rendering context")
 	case C.EGL_BAD_CONFIG:
-		return fmt.Errorf("An EGLConfig argument does not name a valid EGL frame buffer configuration")
+		return fmt.Errorf("an EGLConfig argument does not name a valid EGL frame buffer configuration")
 	case C.EGL_BAD_CURRENT_SURFACE:
-		return fmt.Errorf("The current surface of the calling thread is a window, pixel buffer or pixmap that is no longer valid")
+		return fmt.Errorf("the current surface of the calling thread is a window, pixel buffer or pixmap that is no longer valid")
 	case C.EGL_BAD_DISPLAY:
-		return fmt.Errorf("An EGLDisplay argument does not name a valid EGL display connection")
+		return fmt.Errorf("an EGLDisplay argument does not name a valid EGL display connection")
 	case C.EGL_BAD_SURFACE:
-		return fmt.Errorf("An EGLSurface argument does not name a valid surface (window, pixel buffer or pixmap) configured for GL rendering")
+		return fmt.Errorf("an EGLSurface argument does not name a valid surface (window, pixel buffer or pixmap) configured for GL rendering")
 	case C.EGL_BAD_MATCH:
-		return fmt.Errorf("Arguments are inconsistent (for example, a valid context requires buffers not supplied by a valid surface)")
+		return fmt.Errorf("arguments are inconsistent (for example, a valid context requires buffers not supplied by a valid surface)")
 	case C.EGL_BAD_PARAMETER:
-		return fmt.Errorf("One or more argument values are invalid")
+		return fmt.Errorf("one or more argument values are invalid")
 	case C.EGL_BAD_NATIVE_PIXMAP:
-		return fmt.Errorf("A NativePixmapType argument does not refer to a valid native pixmap")
+		return fmt.Errorf("a NativePixmapType argument does not refer to a valid native pixmap")
 	case C.EGL_BAD_NATIVE_WINDOW:
-		return fmt.Errorf("A NativeWindowType argument does not refer to a valid native window")
+		return fmt.Errorf("a NativeWindowType argument does not refer to a valid native window")
 	case C.EGL_CONTEXT_LOST:
-		return fmt.Errorf("A power management event has occurred. The application must destroy all contexts and reinitialise OpenGL ES state and objects to continue rendering")
+		return fmt.Errorf("a power management event has occurred. The application must destroy all contexts and reinitialise OpenGL ES state and objects to continue rendering")
 	case C.EGL_SUCCESS:
 		return nil
 	default:

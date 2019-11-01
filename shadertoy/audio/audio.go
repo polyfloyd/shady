@@ -63,7 +63,7 @@ func parseMappingValue(pwd, value string) (*source, error) {
 
 	fd, err := os.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("could not open audio source: %v", err)
+		return nil, fmt.Errorf("could not open audio source: %w", err)
 	}
 	return &source{
 		SampleRate: samplerate,

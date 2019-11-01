@@ -193,7 +193,7 @@ func (sh *Shader) reloadEnvironment(ctx context.Context) error {
 		Uniforms:        sh.uniforms,
 	}
 	if err := env.Setup(renderState); err != nil {
-		return fmt.Errorf("error setting up environment: %v", err)
+		return fmt.Errorf("error setting up environment: %w", err)
 	}
 
 	subEnvs, err := env.SubEnvironments()
@@ -293,7 +293,7 @@ func (sh *Shader) nextHandle(interval time.Duration) interface{} {
 func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream chan<- image.Image) {
 	buffer := make(chan interface{}, sh.renderer.NumBuffers())
 	for {
-		if err := sh.reloadEnvironment(ctx); err == context.Canceled {
+		if err := sh.reloadEnvironment(ctx); errors.Is(err, context.Canceled) {
 			return
 		} else if err != nil {
 			log.Printf("Error reloading environment: %v", err)
@@ -448,7 +448,7 @@ func (eng *OnScreenEngine) Animate(ctx context.Context) error {
 			return ctx.Err()
 		}
 
-		if err := eng.reloadEnvironment(ctx); err == context.Canceled {
+		if err := eng.reloadEnvironment(ctx); errors.Is(err, context.Canceled) {
 			return err
 		} else if err != nil {
 			log.Printf("Error reloading environment: %v", err)
@@ -552,7 +552,7 @@ func (eng *OnScreenEngine) reloadEnvironment(ctx context.Context) error {
 		Uniforms:        eng.uniforms,
 	}
 	if err := env.Setup(renderState); err != nil {
-		return fmt.Errorf("error setting up environment: %v", err)
+		return fmt.Errorf("error setting up environment: %w", err)
 	}
 
 	subEnvs, err := env.SubEnvironments()
