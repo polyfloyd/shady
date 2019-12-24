@@ -1,0 +1,28 @@
+name: CI
+
+on: [push]
+
+jobs:
+
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      GOPATH: /home/runner/go
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-go@v1
+      with:
+        go-version: '1.13'
+
+    - run: go get -u golang.org/x/lint/golint
+    - run: sudo apt install libegl1-mesa-dev libgl1-mesa-dev libglfw3-dev
+    - run: sudo apt install libxcursor-dev libxinerama-dev libxi-dev
+    - run: sudo apt install libusb-1.0-0-dev libfreenect-dev
+    - run: go mod download
+
+    - run: gofmt -s -d .
+    - run: $GOPATH/bin/golint -min_confidence 0.3 $(go list ./...)
+    - run: go build -tags kinect ./cmd/shady/
+    - run: go test -test.v -race -cover ./...
