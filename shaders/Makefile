@@ -19,7 +19,7 @@ SHELL=/bin/bash
 RGBFPS=20
 RGBGEOM=150x16
 RGBSECONDS=3
-VIDEOFPS=20
+VIDEOFPS=60
 VIDEOGEOM=1366x768
 VIDEOSECONDS=20
 
@@ -52,13 +52,13 @@ $(SHADY): $(GOFILES)
 $(RGBDIR)/%-${RGBGEOM}-${RGBFPS}fps-${RGBSECONDS}s.rgb.gz: $(SRCDIR)/%.glsl
 	$(E)" [$(COLOR_RGB)RGB$(COLOR_RESET)] $@"
 	$(Q)mkdir -p `dirname $@`
-	$(Q)set -o pipefail && $(SHADY) -v -i $< -g $(RGBGEOM) -framerate $(RGBFPS) -duration $(RGBSECONDS) -ofmt rgb24 | \
+	$(Q)set -o pipefail && $(SHADY) -v -i $< -g $(RGBGEOM) -f $(RGBFPS) -d $(RGBSECONDS) -ofmt rgb24 | \
 		gzip > $@ || rm $@
 
 $(VIDEODIR)/%.mp4: $(SRCDIR)/%.glsl
 	$(E)" [$(COLOR_VIDEO)VIDEO$(COLOR_RESET)] $@"
 	$(Q)mkdir -p `dirname $@`
-	$(Q)$(SHADY) -i $< -g $(VIDEOGEOM) -framerate $(VIDEOFPS) -duration $(VIDEOSECONDS) -ofmt rgb24 | \
-	$(FFMPEG) -f rawvideo -pixel_format rgb24 -video_size $(VIDEOGEOM) \
+	$(Q)$(SHADY) -i $< -g $(VIDEOGEOM) -f $(VIDEOFPS) -d $(VIDEOSECONDS) -ofmt rgb24 | \
+	$(FFMPEG) -hide_banner -loglevel quiet -stats -f rawvideo -pixel_format rgb24 -video_size $(VIDEOGEOM) \
 		-framerate $(VIDEOFPS) -t $(VIDEOSECONDS) -i - -quality good -cpu-used 0 \
 		-qmin 10 -qmax 42 -threads 8 -y $@
