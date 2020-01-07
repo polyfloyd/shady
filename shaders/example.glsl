@@ -22,23 +22,14 @@
  * THE SOFTWARE.
  */
 
-#ifdef GL_ES
-precision mediump float;
-#extension GL_OES_standard_derivatives : enable
-#endif
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 position = ( fragCoord.xy / iResolution.xy );
 
-uniform float time;
-uniform vec2 mouse;
-uniform vec2 resolution;
+    float color = 0.0;
+    color += sin( position.x * cos( iTime / 15.0 ) * 80.0 ) + cos( position.y * cos( iTime / 15.0 ) * 10.0 );
+    color += sin( position.y * sin( iTime / 10.0 ) * 40.0 ) + cos( position.x * sin( iTime / 25.0 ) * 40.0 );
+    color += sin( position.x * sin( iTime / 5.0 ) * 10.0 ) + sin( position.y * sin( iTime / 35.0 ) * 80.0 );
+    color *= sin( iTime / 10.0 ) * 0.5;
 
-void main( void ) {
-	vec2 position = ( gl_FragCoord.xy / resolution.xy ) + mouse / 4.0;
-
-	float color = 0.0;
-	color += sin( position.x * cos( time / 15.0 ) * 80.0 ) + cos( position.y * cos( time / 15.0 ) * 10.0 );
-	color += sin( position.y * sin( time / 10.0 ) * 40.0 ) + cos( position.x * sin( time / 25.0 ) * 40.0 );
-	color += sin( position.x * sin( time / 5.0 ) * 10.0 ) + sin( position.y * sin( time / 35.0 ) * 80.0 );
-	color *= sin( time / 10.0 ) * 0.5;
-
-	gl_FragColor = vec4( vec3( color, color * 0.5, sin( color + time / 3.0 ) * 0.75 ), 1.0 );
+    fragColor = vec4( vec3( color, color * 0.5, sin( color + iTime / 3.0 ) * 0.75 ), 1.0 );
 }
