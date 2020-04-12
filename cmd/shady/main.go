@@ -61,6 +61,9 @@ func main() {
 	flag.Var(&shadertoyMappings, "map", "Specify or override ShaderToy input mappings")
 	flag.Parse()
 
+	if len(inputFiles) == 0 {
+		log.Fatalf("Please specify at least one GLSL file with -i")
+	}
 	if *framerateOld != 0 {
 		log.Println("-framerate is deprecated, please use -f")
 		*framerate = *framerateOld
