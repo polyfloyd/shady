@@ -59,14 +59,26 @@ func (f RGB24Format) Extensions() []string {
 
 func (f RGB24Format) Encode(w io.Writer, img image.Image) error {
 	bounds := img.Bounds()
-	var buf bytes.Buffer
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			r, g, b, _ := img.At(x, y).RGBA()
-			buf.Write([]byte{byte(r / 256), byte(g / 256), byte(b / 256)})
+	buf := make([]byte, bounds.Dx()*bounds.Dy()*3)
+	if rgba, ok := img.(*image.RGBA); ok {
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				i := y*bounds.Dx() + x
+				copy(buf[i*3:i*3+3], rgba.Pix[i*4:i*4+3])
+			}
+		}
+	} else {
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				i := y*bounds.Dx() + x
+				r, g, b, _ := img.At(x, y).RGBA()
+				buf[i*3] = byte(r >> 8)
+				buf[i*3+1] = byte(g >> 8)
+				buf[i*3+2] = byte(b >> 8)
+			}
 		}
 	}
-	_, err := io.Copy(w, &buf)
+	_, err := w.Write(buf)
 	return err
 }
 
