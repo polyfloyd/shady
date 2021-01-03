@@ -100,7 +100,9 @@ func (st ShaderToy) Sources() (map[renderer.Stage][]renderer.Source, error) {
 			}
 			ss = append(ss, renderer.SourceBuf(`
 				void main(void) {
-					mainImage(gl_FragColor, gl_FragCoord.xy);
+					vec2 pos = gl_FragCoord.xy;
+					pos.y = iResolution.y - pos.y - 1;
+					mainImage(gl_FragColor, pos);
 				}
 			`))
 			return ss

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
 	"io"
 	"log"
 	"os"
@@ -27,7 +26,7 @@ const (
 		out vec2 texCoord;
 
 		void main() {
-			gl_Position = vec4(pos.x, pos.y, 0.0, 1.0);
+			gl_Position = vec4(pos.x, -pos.y, 0.0, 1.0);
 			texCoord = pos * .5 + .5;
 		}
 	`)
@@ -312,7 +311,7 @@ func (sh *Shader) Animate(ctx context.Context, interval time.Duration, stream ch
 		select {
 		case <-ctx.Done():
 			return
-		case stream <- &flip{Image: img}:
+		case stream <- img:
 		}
 	}
 }
@@ -590,16 +589,6 @@ func (eng *OnScreenEngine) reloadEnvironment(ctx context.Context) error {
 
 func (eng *OnScreenEngine) SetEnvironment(env Environment) {
 	eng.newEnvs <- env
-}
-
-// flip wraps an image and flips it upside down.
-type flip struct {
-	image.Image
-}
-
-func (flip *flip) At(x, y int) color.Color {
-	h := flip.Bounds().Dy()
-	return flip.Image.At(x, h-y-1)
 }
 
 type renderer interface {
