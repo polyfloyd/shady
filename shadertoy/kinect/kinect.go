@@ -25,7 +25,6 @@ import (
 	"image"
 	"log"
 	"math"
-	"reflect"
 	"sync"
 	"unsafe"
 
@@ -209,16 +208,12 @@ outer:
 	C.freenect_shutdown(kin.ctx)
 }
 
-func (kin *kinect) rgbCallback(rgbPtr uintptr) {
+func (kin *kinect) rgbCallback(rgbPtr *uint8) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 
 	length := resolution.Dx() * resolution.Dy()
-	rgb := *(*[]uint8)((unsafe.Pointer)(&reflect.SliceHeader{
-		Data: rgbPtr,
-		Len:  length * 3,
-		Cap:  length * 3,
-	}))
+	rgb := unsafe.Slice(rgbPtr, length*3)
 
 	for i := 0; i < length; i++ {
 		kin.currentImage.Pix[i*4] = rgb[i*3]
@@ -227,16 +222,12 @@ func (kin *kinect) rgbCallback(rgbPtr uintptr) {
 	}
 }
 
-func (kin *kinect) depthCallback(depthPtr uintptr) {
+func (kin *kinect) depthCallback(depthPtr *uint8) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 
 	length := resolution.Dx() * resolution.Dy()
-	depth := *(*[]uint16)((unsafe.Pointer)(&reflect.SliceHeader{
-		Data: depthPtr,
-		Len:  length,
-		Cap:  length,
-	}))
+	depth := unsafe.Slice((*uint8)(depthPtr), length)
 
 	for i, value := range depth {
 		kin.currentImage.Pix[i*4+3] = gamma[value]

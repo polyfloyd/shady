@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var DefaultDisplay = NativeDisplayType{v: C.EGL_DEFAULT_DISPLAY}
+var DefaultDisplay = NativeDisplayType{v: C.EGLNativeDisplayType(C.EGL_DEFAULT_DISPLAY)}
 
 type NativeDisplayType struct {
 	v C.EGLNativeDisplayType

@@ -1,4 +1,4 @@
-// +build kinect
+//go:build kinect
 
 package main
 

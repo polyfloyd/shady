@@ -5,7 +5,7 @@ import "C"
 import "fmt"
 
 //export rgbCallbackGo
-func rgbCallbackGo(dev *C.freenect_device, rgbPtr uintptr, timestamp C.uint32_t) {
+func rgbCallbackGo(dev *C.freenect_device, rgbPtr *uint8, timestamp C.uint32_t) {
 	instanceHandle := uintptr(C.freenect_get_user(dev))
 	h, ok := instances.Load(instanceHandle)
 	if !ok {
@@ -16,7 +16,7 @@ func rgbCallbackGo(dev *C.freenect_device, rgbPtr uintptr, timestamp C.uint32_t)
 }
 
 //export depthCallbackGo
-func depthCallbackGo(dev *C.freenect_device, depthPtr uintptr, timestamp C.uint32_t) {
+func depthCallbackGo(dev *C.freenect_device, depthPtr *uint8, timestamp C.uint32_t) {
 	instanceHandle := uintptr(C.freenect_get_user(dev))
 	h, ok := instances.Load(instanceHandle)
 	if !ok {
