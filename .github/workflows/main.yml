@@ -18,7 +18,7 @@ jobs:
 
     - run: go get -u golang.org/x/lint/golint
     - run: sudo apt install libegl1-mesa-dev libgl1-mesa-dev libglfw3-dev
-    - run: sudo apt install libxcursor-dev libxinerama-dev libxi-dev
+    - run: sudo apt install libxcursor-dev libxinerama-dev libxi-dev libxxf86vm-dev
     - run: sudo apt install libusb-1.0-0-dev libfreenect-dev
     - run: go mod download
 
