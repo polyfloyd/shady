@@ -9,7 +9,7 @@ development and hacking.
 ## Usage
 ### Installation
 ```sh
-go get -u github.com/polyfloyd/shady/cmd/shady
+go install github.com/polyfloyd/shady/cmd/shady@latest
 ```
 
 ### Shadertoy
