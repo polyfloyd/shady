@@ -6,17 +6,9 @@ package kinect
 // void rgbCallbackGo(freenect_device *dev, void *rgb, uint32_t timestamp);
 // void depthCallbackGo(freenect_device *dev, void *depth, uint32_t timestamp);
 //
-// void rgb_cb_cgo(freenect_device *dev, void *rgb, uint32_t timestamp) {
-//   rgbCallbackGo(dev, rgb, timestamp);
-// }
-//
-// void depth_cb_cgo(freenect_device *dev, void *depth, uint32_t timestamp) {
-//   depthCallbackGo(dev, depth, timestamp);
-// }
-//
 // void init_callbacks_cgo(freenect_device *dev) {
-//   freenect_set_depth_callback(dev, depth_cb_cgo);
-//   freenect_set_video_callback(dev, rgb_cb_cgo);
+//   freenect_set_depth_callback(dev, depthCallbackGo);
+//   freenect_set_video_callback(dev, rgbCallbackGo);
 // }
 import "C"
 
@@ -198,7 +190,6 @@ outer:
 
 		if C.freenect_process_events(kin.ctx) < 0 {
 			log.Printf("error processing freenect events")
-			break outer
 		}
 	}
 
@@ -208,12 +199,12 @@ outer:
 	C.freenect_shutdown(kin.ctx)
 }
 
-func (kin *kinect) rgbCallback(rgbPtr *uint8) {
+func (kin *kinect) rgbCallback(rgbPtr *C.void) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 
 	length := resolution.Dx() * resolution.Dy()
-	rgb := unsafe.Slice(rgbPtr, length*3)
+	rgb := unsafe.Slice((*uint8)(unsafe.Pointer(rgbPtr)), length*3)
 
 	for i := 0; i < length; i++ {
 		kin.currentImage.Pix[i*4] = rgb[i*3]
@@ -222,12 +213,12 @@ func (kin *kinect) rgbCallback(rgbPtr *uint8) {
 	}
 }
 
-func (kin *kinect) depthCallback(depthPtr *uint8) {
+func (kin *kinect) depthCallback(depthPtr *C.void) {
 	kin.currentImageLock.Lock()
 	defer kin.currentImageLock.Unlock()
 
 	length := resolution.Dx() * resolution.Dy()
-	depth := unsafe.Slice((*uint8)(depthPtr), length)
+	depth := unsafe.Slice((*uint16)(unsafe.Pointer(depthPtr)), length)
 
 	for i, value := range depth {
 		kin.currentImage.Pix[i*4+3] = gamma[value]
