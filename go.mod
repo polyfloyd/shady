@@ -10,4 +10,4 @@ require (
 
 require golang.org/x/sys v0.17.0 // indirect
 
-go 1.17
+go 1.23
