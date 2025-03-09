@@ -1,6 +1,13 @@
 name: CI
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_call:
 
 jobs:
 
@@ -11,8 +18,8 @@ jobs:
       GOPATH: /home/runner/go
 
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions/setup-go@v1
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
       with:
         go-version: stable
 
@@ -21,6 +28,12 @@ jobs:
     - run: sudo apt install libxcursor-dev libxinerama-dev libxi-dev libxxf86vm-dev
     - run: sudo apt install libusb-1.0-0-dev libfreenect-dev
     - run: go mod download
+
+    - name: Check go mod
+      run: |
+        go mod tidy
+        git diff --exit-code go.mod
+        git diff --exit-code go.sum
 
     - run: gofmt -s -d .
     - run: $GOPATH/bin/golint -min_confidence 0.3 $(go list ./...)
